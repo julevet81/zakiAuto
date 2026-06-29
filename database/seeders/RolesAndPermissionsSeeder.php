@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
@@ -66,6 +65,14 @@ class RolesAndPermissionsSeeder extends Seeder
         'orders.view_assigned', // agent: only orders for their own customers
         'orders.change_status',
 
+        // Cars - cost visibility is a SEPARATE, narrower permission than
+        // cars.view. Per the explicit requirement: "مساعد مدير النظام
+        // (Admin): صلاحية كاملة على جميع أجزاء النظام ما عدا أسعار الشراء
+        // والشحن والفائدة لكل سيارة" — i.e. admin gets full CRUD on cars
+        // (cars.view/create/update/delete) but NOT cost visibility.
+        // Only super-admin holds cars.view_cost.
+        'cars.view_cost',
+
         // Customers/agents scoped visibility
         'customers.view_assigned', // agent: only their own customers
 
@@ -73,6 +80,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'dashboard.view',
         'reports.view',
         'reports.export',
+        'reports.view_profit', // profit/loss figures - super-admin only, same reasoning as cars.view_cost
 
         // Roles & permissions management
         'roles.view',
@@ -115,11 +123,19 @@ class RolesAndPermissionsSeeder extends Seeder
         // super-admin: everything, including role/permission management and user management.
         $superAdmin->syncPermissions(Permission::where('guard_name', $guard)->get());
 
-        // admin: full operational access, EXCLUDING role/permission management
-        // and excluding destructive user management (super-admin keeps that).
+        // admin: full operational access, EXCLUDING role/permission
+        // management, destructive user deletion, AND cost/profit
+        // visibility (purchase prices, shipping costs, per-car profit) —
+        // per the explicit requirement that "Admin" sees everything
+        // EXCEPT purchase/shipping costs and profit figures, which are
+        // reserved for "Super Admin" only.
         $adminPermissions = Permission::where('guard_name', $guard)
             ->where('name', 'not like', 'roles.%')
-            ->whereNotIn('name', ['users.delete'])
+            ->whereNotIn('name', [
+                'users.delete',
+                'cars.view_cost',
+                'reports.view_profit',
+            ])
             ->pluck('name')
             ->all();
         $admin->syncPermissions($adminPermissions);
@@ -150,11 +166,11 @@ class RolesAndPermissionsSeeder extends Seeder
         // Default super-admin user, only created if it doesn't exist yet.
         // IMPORTANT: change this password immediately after first deploy.
         // ------------------------------------------------------------------
-        $user = User::firstOrCreate(
-            ['email' => 'superadmin@zaki.com'],
+        $user = \App\Models\User::firstOrCreate(
+            ['email' => 'superadmin@example.com'],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('12345678'),
+                'password' => Hash::make('ChangeMe123!'),
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]

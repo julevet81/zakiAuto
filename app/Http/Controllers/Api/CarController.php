@@ -15,22 +15,27 @@ use Illuminate\Http\Request;
 class CarController extends Controller
 {
     /**
-     * List cars with filters relevant to both staff (full data) and
-     * customers/agents (sale-price-only browsing).
+     * List cars with filters relevant to every audience:
+     *   - super-admin (cars.view_cost): full data including cost/profit.
+     *   - admin (suppliers.view but NOT cars.view_cost): full operational
+     *     data (supplier, batch...) but never cost figures.
+     *   - agent/customer (plain cars.view only): browsing data only
+     *     (brand/model/sale price), catalogue filtered to non-sold cars.
      */
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Car::class);
 
-        $canSeeCosts = $request->user()->can('suppliers.view');
+        $user = $request->user();
+        $canSeeOperationalData = $user->can('suppliers.view');
 
         $query = Car::query()
-            ->when($canSeeCosts, fn ($q) => $q->with(['supplier', 'containerOpener']))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('brand'), fn ($q) => $q->where('brand', 'like', '%'.$request->string('brand').'%'))
-            ->when($request->filled('batch_id'), fn ($q) => $q->where('batch_id', $request->integer('batch_id')))
-            ->when($request->filled('supplier_id') && $canSeeCosts, fn ($q) => $q->where('supplier_id', $request->integer('supplier_id')))
-            ->when($request->filled('vin'), fn ($q) => $q->where('vin', $request->string('vin')))
+            ->when($canSeeOperationalData, fn($q) => $q->with(['supplier', 'containerOpener']))
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))
+            ->when($request->filled('batch_id'), fn($q) => $q->where('batch_id', $request->integer('batch_id')))
+            ->when($request->filled('supplier_id') && $canSeeOperationalData, fn($q) => $q->where('supplier_id', $request->integer('supplier_id')))
+            ->when($request->filled('vin'), fn($q) => $q->where('vin', $request->string('vin')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
                 $q->where(function ($q) use ($term) {
@@ -39,9 +44,9 @@ class CarController extends Controller
                         ->orWhere('vin', 'like', "%{$term}%");
                 });
             })
-            // Customers browsing the catalogue should only see cars not
-            // already sold/reserved to someone else.
-            ->when(! $canSeeCosts, fn ($q) => $q->whereNotIn('status', [Car::STATUS_SOLD]))
+            // Anyone without operational visibility (agent/customer) is
+            // browsing a sales catalogue: exclude already-sold cars.
+            ->when(! $canSeeOperationalData, fn($q) => $q->whereNotIn('status', [Car::STATUS_SOLD]))
             ->orderByDesc('id');
 
         $cars = $query->paginate($request->integer('per_page', 15));
@@ -63,11 +68,17 @@ class CarController extends Controller
     {
         $this->authorize('view', $car);
 
-        $canSeeCosts = $request->user()->can('suppliers.view');
+        $user = $request->user();
+        $canSeeOperationalData = $user->can('suppliers.view');
+        $canSeeCosts = $user->can('cars.view_cost');
 
         $car->load(['documents']);
+
+        if ($canSeeOperationalData) {
+            $car->load(['supplier', 'containerOpener', 'order']);
+        }
         if ($canSeeCosts) {
-            $car->load(['supplier', 'containerOpener', 'expenses', 'generalExpenses', 'order']);
+            $car->load(['expenses', 'generalExpenses']);
         }
 
         return response()->json([
@@ -102,6 +113,11 @@ class CarController extends Controller
 
     /**
      * Add a cost line (customs, transport, repair...) to a car.
+     *
+     * NOTE: adding an expense only requires cars.update (an admin manages
+     * a car's logistics and may need to log a cost line as it happens),
+     * but per expenses() below, an admin still cannot READ the resulting
+     * cost breakdown — only super-admin (cars.view_cost) can.
      */
     public function storeExpense(StoreCarExpenseRequest $request, Car $car): JsonResponse
     {
@@ -114,15 +130,15 @@ class CarController extends Controller
     }
 
     /**
-     * List cost lines for a car (separate endpoint, in case the listing
-     * needs its own pagination/filtering independent of the car payload).
+     * List cost lines for a car. Cost-tier data: requires cars.view_cost
+     * (super-admin only), separate from cars.update used by storeExpense.
      */
     public function expenses(Request $request, Car $car): JsonResponse
     {
         $this->authorize('view', $car);
 
-        if (! $request->user()->can('suppliers.view')) {
-            return response()->json(['message' => 'لا تملك الصلاحية اللازمة'], 403);
+        if (! $request->user()->can('cars.view_cost')) {
+            return response()->json(['message' => 'لا تملك الصلاحية اللازمة لعرض تكاليف السيارة'], 403);
         }
 
         return response()->json([
