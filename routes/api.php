@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CarController;
 use App\Http\Controllers\Api\ContainerOpenerController;
 use App\Http\Controllers\Api\ServiceProviderController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SupplierPaymentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -66,5 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('cars', CarController::class);
     Route::get('cars/{car}/expenses', [CarController::class, 'expenses']);
     Route::post('cars/{car}/expenses', [CarController::class, 'storeExpense']);
+
+    Route::apiResource('supplier-payments', SupplierPaymentController::class)
+        ->parameters(['supplier-payments' => 'supplier_payment']);
 });
 
