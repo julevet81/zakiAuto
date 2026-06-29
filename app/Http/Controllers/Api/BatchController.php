@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Batch\StoreBatchRequest;
+use App\Http\Requests\Batch\UpdateBatchRequest;
+use App\Http\Resources\BatchResource;
+use App\Models\Batch;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class BatchController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Batch::class);
+
+        $batches = Batch::query()
+            ->with('supplier')
+            ->withCount('cars')
+            ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->integer('supplier_id')))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('batch_number', 'like', '%'.$request->string('search').'%');
+            })
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 15));
+
+        return response()->json(BatchResource::collection($batches)->response()->getData(true));
+    }
+
+    public function store(StoreBatchRequest $request): JsonResponse
+    {
+        $batch = Batch::create($request->validated() + ['status' => $request->input('status', Batch::STATUS_PENDING)]);
+
+        return response()->json([
+            'message' => 'تم إنشاء دفعة الاستيراد بنجاح',
+            'data' => new BatchResource($batch->load('supplier')),
+        ], 201);
+    }
+
+    public function show(Batch $batch): JsonResponse
+    {
+        $this->authorize('view', $batch);
+
+        $batch->load(['supplier', 'cars', 'payments']);
+
+        return response()->json([
+            'data' => new BatchResource($batch),
+        ]);
+    }
+
+    public function update(UpdateBatchRequest $request, Batch $batch): JsonResponse
+    {
+        $batch->update($request->validated());
+
+        return response()->json([
+            'message' => 'تم تحديث دفعة الاستيراد بنجاح',
+            'data' => new BatchResource($batch->load('supplier')),
+        ]);
+    }
+
+    public function destroy(Batch $batch): JsonResponse
+    {
+        $this->authorize('delete', $batch);
+
+        if ($batch->cars()->exists() || $batch->payments()->exists()) {
+            return response()->json([
+                'message' => 'لا يمكن حذف الدفعة لوجود سيارات أو دفعات مالية مرتبطة بها',
+            ], 422);
+        }
+
+        $batch->delete();
+
+        return response()->json(['message' => 'تم حذف الدفعة بنجاح']);
+    }
+}
