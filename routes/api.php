@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AgentTransactionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BatchController;
 use App\Http\Controllers\Api\CarController;
+use App\Http\Controllers\Api\CarsTableController;
 use App\Http\Controllers\Api\ContainerOpenerController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\CustomerPaymentController;
@@ -72,6 +73,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // ------------------------------------------------------------------
     // ثانيًا: السيارات
     // ------------------------------------------------------------------
+    // جدول السيارات المسطّح للتصدير - يجب تسجيله قبل apiResource('cars')
+    // كي لا يلتقط route model binding كلمة "table" كقيمة لـ {car}.
+    Route::get('cars/table', [CarsTableController::class, 'index']);
+    Route::get('cars/table/export', [CarsTableController::class, 'export']);
+
     Route::apiResource('cars', CarController::class);
     Route::get('cars/{car}/expenses', [CarController::class, 'expenses']);
     Route::post('cars/{car}/expenses', [CarController::class, 'storeExpense']);

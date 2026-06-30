@@ -110,6 +110,25 @@ class Car extends Model
     }
 
     /**
+     * Sum of this car's expense lines whose type indicates shipping
+     * (Arabic "شحن" or English "shipping", case-insensitive). There is no
+     * dedicated `expense_type` enum in the migration — it's a free-text
+     * string — so this is a best-effort match on that text rather than an
+     * exact category lookup. If your team standardizes on a specific
+     * expense_type value for shipping (e.g. always exactly "شحن"), you can
+     * tighten this to an exact `where('expense_type', 'شحن')` instead.
+     */
+    public function getShippingPriceAttribute(): float
+    {
+        return (float) $this->expenses()
+            ->where(function ($q) {
+                $q->where('expense_type', 'like', '%شحن%')
+                    ->orWhere('expense_type', 'like', '%shipping%');
+            })
+            ->sum('local_amount');
+    }
+
+    /**
      * Total of all car-specific expenses (local currency).
      */
     public function getTotalExpensesAttribute(): float

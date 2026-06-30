@@ -789,6 +789,161 @@ paths:
         '422':
           description: لا يمكن الحذف لوجود سيارات أو دفعات مرتبطة
 
+  /cars/table:
+    get:
+      tags: [Cars]
+      summary: جدول السيارات المسطّح بالأعمدة المحددة (super-admin فقط - cars.view_cost)
+      description: |
+        صف واحد لكل سيارة بالأعمدة بالضبط: brand, model, finition,
+        manufacture_year, color, vin, foreign_purchase_price,
+        tracking_number, customer_full_name, customer_passport_no,
+        customer_national_id, shipping_price, arrival_date.
+
+        هذا تقرير تكلفة بالكامل (يحتوي سعر الشراء وتكلفة الشحن)، لذا يتطلب
+        صلاحية cars.view_cost كاملة وليس suppliers.view العامة، خلافًا
+        لـ GET /cars المعتاد الذي يُظهر بيانات مُخفّفة حسب الصلاحية.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, reserved, shipping, arrived, delivered, sold]
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: batch_id
+          in: query
+          schema:
+            type: integer
+        - name: supplier_id
+          in: query
+          schema:
+            type: integer
+        - name: vin
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/SearchParam'
+        - name: arrival_date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: arrival_date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        brand:
+                          type: string
+                        model:
+                          type: string
+                        finition:
+                          type: string
+                          nullable: true
+                        manufacture_year:
+                          type: integer
+                        color:
+                          type: string
+                          nullable: true
+                        vin:
+                          type: string
+                          nullable: true
+                        foreign_purchase_price:
+                          type: number
+                        tracking_number:
+                          type: string
+                          nullable: true
+                        customer_full_name:
+                          type: string
+                          nullable: true
+                          description: فارغ إن لم تكن السيارة مرتبطة بطلب بعد
+                        customer_passport_no:
+                          type: string
+                          nullable: true
+                        customer_national_id:
+                          type: string
+                          nullable: true
+                        shipping_price:
+                          type: number
+                          description: مجموع تكاليف الشحن المسجّلة على السيارة في car_expenses
+                        arrival_date:
+                          type: string
+                          format: date
+                          nullable: true
+                  meta:
+                    $ref: '#/components/schemas/Pagination'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /cars/table/export:
+    get:
+      tags: [Cars]
+      summary: تصدير جدول السيارات بصيغة Excel (.xlsx) بنفس الأعمدة والفلاتر
+      description: |
+        يستخدم نفس الفلاتر المتاحة في GET /cars/table، ويُرجع كل النتائج
+        المطابقة دفعة واحدة (بدون pagination)، بصيغة .xlsx جاهزة للتحميل.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, reserved, shipping, arrived, delivered, sold]
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: batch_id
+          in: query
+          schema:
+            type: integer
+        - name: supplier_id
+          in: query
+          schema:
+            type: integer
+        - name: vin
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/SearchParam'
+        - name: arrival_date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: arrival_date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: ملف Excel جاهز للتحميل
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /cars:
     get:
       tags: [Cars]
