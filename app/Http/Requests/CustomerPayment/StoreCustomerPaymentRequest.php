@@ -30,9 +30,7 @@ class StoreCustomerPaymentRequest extends FormRequest
             ])],
             // Required only when an agent physically collected the cash.
             'agent_id' => [
-                'nullable',
-                'integer',
-                'exists:agents,id',
+                'nullable', 'integer', 'exists:agents,id',
                 Rule::requiredIf($this->input('received_by') === CustomerPayment::RECEIVED_BY_AGENT),
             ],
             'attachment' => ['nullable', 'string', 'max:255'],
@@ -85,7 +83,7 @@ class StoreCustomerPaymentRequest extends FormRequest
             if ($amount > (float) $order->remaining_amount) {
                 $validator->errors()->add(
                     'amount',
-                    'المبلغ المُدخل يتجاوز المتبقي على الطلب (' . $order->remaining_amount . ')'
+                    'المبلغ المُدخل يتجاوز المتبقي على الطلب ('.$order->remaining_amount.')'
                 );
             }
 

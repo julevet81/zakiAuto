@@ -2,8 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Http\Resources\AgentMiniResource;
-use App\Http\Resources\CustomerPaymentResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,7 +30,7 @@ class CustomerResource extends JsonResource
 
             'orders_count' => $this->when(
                 isset($this->orders_count) || $this->relationLoaded('orders'),
-                fn() => $this->orders_count ?? $this->orders->count()
+                fn () => $this->orders_count ?? $this->orders->count()
             ),
 
             // Financial summary - only computed for staff who can see
@@ -40,11 +38,11 @@ class CustomerResource extends JsonResource
             // costs two extra aggregate queries per customer.
             'total_paid' => $this->when(
                 $request->boolean('with_stats') && $request->user()?->can('customer_payments.view'),
-                fn() => (float) $this->total_paid
+                fn () => (float) $this->total_paid
             ),
             'total_remaining' => $this->when(
                 $request->boolean('with_stats') && $request->user()?->can('orders.view'),
-                fn() => (float) $this->total_remaining
+                fn () => (float) $this->total_remaining
             ),
 
             'orders' => OrderMiniResource::collection($this->whenLoaded('orders')),

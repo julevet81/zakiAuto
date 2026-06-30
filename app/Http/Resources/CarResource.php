@@ -35,8 +35,8 @@ class CarResource extends JsonResource
             'batch_id' => $this->when($canSeeOperationalData, $this->batch_id),
             'supplier_id' => $this->when($canSeeOperationalData, $this->supplier_id),
             'container_opener_id' => $this->when($canSeeOperationalData, $this->container_opener_id),
-            'supplier' => $this->when($canSeeOperationalData, fn() => new SupplierMiniResource($this->whenLoaded('supplier'))),
-            'container_opener' => $this->when($canSeeOperationalData, fn() => new ContainerOpenerResource($this->whenLoaded('containerOpener'))),
+            'supplier' => $this->when($canSeeOperationalData, fn () => new SupplierMiniResource($this->whenLoaded('supplier'))),
+            'container_opener' => $this->when($canSeeOperationalData, fn () => new ContainerOpenerResource($this->whenLoaded('containerOpener'))),
 
             'brand' => $this->brand,
             'model' => $this->model,
@@ -64,11 +64,11 @@ class CarResource extends JsonResource
             // only, only computed when the relations are loaded.
             'total_expenses' => $this->when(
                 $canSeeCosts && $this->relationLoaded('expenses') && $this->relationLoaded('generalExpenses'),
-                fn() => $this->total_expenses
+                fn () => $this->total_expenses
             ),
             'estimated_profit' => $this->when(
                 $canSeeCosts && $this->relationLoaded('expenses') && $this->relationLoaded('generalExpenses'),
-                fn() => $this->estimated_profit
+                fn () => $this->estimated_profit
             ),
 
             'is_sold' => $this->isSold(),
@@ -77,7 +77,7 @@ class CarResource extends JsonResource
             // is cost-tier data even though "who can edit the car" is
             // broader — an admin can ADD an expense (cars.update) without
             // being able to SEE the resulting cost breakdown here.
-            'expenses' => $this->when($canSeeCosts, fn() => CarExpenseResource::collection($this->whenLoaded('expenses'))),
+            'expenses' => $this->when($canSeeCosts, fn () => CarExpenseResource::collection($this->whenLoaded('expenses'))),
             'documents' => DocumentResource::collection($this->whenLoaded('documents')),
             'order' => new \App\Http\Resources\OrderMiniResource($this->whenLoaded('order')),
 

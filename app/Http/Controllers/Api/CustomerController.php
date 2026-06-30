@@ -35,7 +35,7 @@ class CustomerController extends Controller
             });
 
         if ($user->can('customers.view')) {
-            $query->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
+            $query->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')));
         } elseif ($user->can('customers.view_assigned')) {
             // Agent without the full customers.view permission: hard-scope
             // to their own agent record, ignoring any agent_id they send.

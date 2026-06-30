@@ -24,11 +24,11 @@ class AgentTransactionController extends Controller
 
         $query = AgentTransaction::query()
             ->with(['agent:id,name', 'customerPayment', 'treasuryTransaction'])
-            ->when($request->filled('date_from'), fn($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')));
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')));
 
         if ($user->can('agent_transactions.view')) {
-            $query->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
+            $query->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')));
         } else {
             $query->where('agent_id', $user->agent?->id ?? 0);
         }

@@ -1,45 +1,128 @@
 <?php
 
-namespace App\Policies;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Agent\StoreAgentRequest;
+use App\Http\Requests\Agent\UpdateAgentRequest;
+use App\Http\Resources\AgentResource;
+use App\Http\Resources\AgentTransactionResource;
+use App\Http\Resources\CustomerResource;
 use App\Models\Agent;
-use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
-class AgentPolicy
+class AgentController extends Controller
 {
-    /**
-     * Agent management itself (creating/editing other agents, full list)
-     * is an admin-only area — an agent never browses other agents. An
-     * agent only ever needs to see/update their OWN record, handled in
-     * view()/update() below.
-     */
-    public function viewAny(User $user): bool
+    public function index(Request $request): JsonResponse
     {
-        return $user->can('agents.view');
+        $this->authorize('viewAny', Agent::class);
+
+        $agents = Agent::query()
+            ->withCount(['customers', 'orders'])
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $term = $request->string('search');
+                $q->where(function ($q) use ($term) {
+                    $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%");
+                });
+            })
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 15));
+
+        return response()->json(AgentResource::collection($agents)->response()->getData(true));
     }
 
-    public function view(User $user, Agent $agent): bool
+    public function store(StoreAgentRequest $request): JsonResponse
     {
-        if ($user->can('agents.view')) {
-            return true;
+        $agent = Agent::create($request->validated());
+
+        return response()->json([
+            'message' => 'تم إضافة الوكيل بنجاح',
+            'data' => new AgentResource($agent),
+        ], 201);
+    }
+
+    public function show(Agent $agent): JsonResponse
+    {
+        $this->authorize('view', $agent);
+
+        $agent->loadCount(['customers', 'orders']);
+
+        return response()->json([
+            'data' => new AgentResource($agent),
+        ]);
+    }
+
+    public function update(UpdateAgentRequest $request, Agent $agent): JsonResponse
+    {
+        $agent->update($request->validated());
+
+        return response()->json([
+            'message' => 'تم تحديث بيانات الوكيل بنجاح',
+            'data' => new AgentResource($agent),
+        ]);
+    }
+
+    /**
+     * Delete an agent. Blocked if they have any customers or orders, to
+     * avoid orphaning commission/ledger history.
+     */
+    public function destroy(Agent $agent): JsonResponse
+    {
+        $this->authorize('delete', $agent);
+
+        if ($agent->customers()->exists() || $agent->orders()->exists()) {
+            return response()->json([
+                'message' => 'لا يمكن حذف الوكيل لوجود عملاء أو طلبات مرتبطة به',
+            ], 422);
         }
 
-        // An agent may view their own profile/statement.
-        return $user->agent?->id === $agent->id;
+        $agent->delete();
+
+        return response()->json(['message' => 'تم حذف الوكيل بنجاح']);
     }
 
-    public function create(User $user): bool
+    /**
+     * List the customers assigned to this agent (explicit requirement:
+     * "عرض العملاء التابعين لكل وكيل"), as its own endpoint so the UI can
+     * paginate/filter it independently of the agent's main payload.
+     */
+    public function customers(Request $request, Agent $agent): JsonResponse
     {
-        return $user->can('agents.create');
+        $this->authorize('view', $agent);
+
+        $customers = $agent->customers()
+            ->withCount('orders')
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 15));
+
+        return response()->json(CustomerResource::collection($customers)->response()->getData(true));
     }
 
-    public function update(User $user, Agent $agent): bool
+    /**
+     * Agent statement of account (explicit requirement: "عرض كشف حساب
+     * الوكيل") — the full chronological ledger from agent_transactions,
+     * each line already carrying its running previous/current balance.
+     */
+    public function statement(Request $request, Agent $agent): JsonResponse
     {
-        return $user->can('agents.update');
-    }
+        $this->authorize('view', $agent);
 
-    public function delete(User $user, Agent $agent): bool
-    {
-        return $user->can('agents.delete');
+        $transactions = $agent->transactions()
+            ->with(['customerPayment', 'treasuryTransaction'])
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
+            ->orderBy('transaction_date')
+            ->orderBy('id')
+            ->paginate($request->integer('per_page', 30));
+
+        return response()->json([
+            'agent' => [
+                'id' => $agent->id,
+                'name' => $agent->name,
+                'current_balance' => $agent->current_balance,
+            ],
+            'statement' => AgentTransactionResource::collection($transactions)->response()->getData(true),
+        ]);
     }
 }

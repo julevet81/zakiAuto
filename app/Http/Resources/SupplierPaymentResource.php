@@ -19,7 +19,7 @@ class SupplierPaymentResource extends JsonResource
         return [
             'id' => $this->id,
             'batch_id' => $this->batch_id,
-            'batch' => $this->whenLoaded('batch', fn() => [
+            'batch' => $this->whenLoaded('batch', fn () => [
                 'id' => $this->batch->id,
                 'batch_number' => $this->batch->batch_number,
                 'status' => $this->batch->status,
@@ -38,7 +38,7 @@ class SupplierPaymentResource extends JsonResource
             'notes' => $this->notes,
 
             'created_by' => $this->created_by,
-            'creator' => $this->whenLoaded('creator', fn() => [
+            'creator' => $this->whenLoaded('creator', fn () => [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,
             ]),

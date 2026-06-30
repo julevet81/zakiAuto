@@ -21,7 +21,7 @@ class ExpenseResource extends JsonResource
             'car_id' => $this->car_id,
             'order_id' => $this->order_id,
             'service_provider_id' => $this->service_provider_id,
-            'service_provider' => $this->whenLoaded('serviceProvider', fn() => $this->serviceProvider ? [
+            'service_provider' => $this->whenLoaded('serviceProvider', fn () => $this->serviceProvider ? [
                 'id' => $this->serviceProvider->id,
                 'name' => $this->serviceProvider->name,
                 'provider_type' => $this->serviceProvider->provider_type,
@@ -37,7 +37,7 @@ class ExpenseResource extends JsonResource
             'notes' => $this->notes,
 
             'created_by' => $this->created_by,
-            'creator' => $this->whenLoaded('creator', fn() => [
+            'creator' => $this->whenLoaded('creator', fn () => [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,
             ]),

@@ -18,11 +18,11 @@ class ExpenseController extends Controller
 
         $expenses = Expense::query()
             ->with(['serviceProvider'])
-            ->when($request->filled('car_id'), fn($q) => $q->where('car_id', $request->integer('car_id')))
-            ->when($request->filled('order_id'), fn($q) => $q->where('order_id', $request->integer('order_id')))
-            ->when($request->filled('expense_type'), fn($q) => $q->where('expense_type', $request->string('expense_type')))
-            ->when($request->filled('date_from'), fn($q) => $q->whereDate('expense_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('expense_date', '<=', $request->date('date_to')))
+            ->when($request->filled('car_id'), fn ($q) => $q->where('car_id', $request->integer('car_id')))
+            ->when($request->filled('order_id'), fn ($q) => $q->where('order_id', $request->integer('order_id')))
+            ->when($request->filled('expense_type'), fn ($q) => $q->where('expense_type', $request->string('expense_type')))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('expense_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('expense_date', '<=', $request->date('date_to')))
             ->orderByDesc('expense_date')
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 15));

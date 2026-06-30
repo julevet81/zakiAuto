@@ -167,10 +167,10 @@ class RolesAndPermissionsSeeder extends Seeder
         // IMPORTANT: change this password immediately after first deploy.
         // ------------------------------------------------------------------
         $user = \App\Models\User::firstOrCreate(
-            ['email' => 'superadmin@example.com'],
+            ['email' => 'superadmin@zaki.com'],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('ChangeMe123!'),
+                'password' => Hash::make('12345678'),
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]

@@ -1,12 +1,23 @@
 <?php
 
+use App\Http\Controllers\Api\AgentController;
+use App\Http\Controllers\Api\AgentTransactionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BatchController;
 use App\Http\Controllers\Api\CarController;
 use App\Http\Controllers\Api\ContainerOpenerController;
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CustomerPaymentController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ServiceProviderController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierPaymentController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,29 +25,22 @@ use Illuminate\Support\Facades\Route;
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Phase 1: Auth (register/login/me/logout).
-| Phase 2 (this update): Suppliers, Cars (+ nested car expenses),
-| Container Openers, Service Providers, Import Batches.
-|
-| Authorization for these resources is enforced TWICE on purpose:
-|   1) Controller-level via $this->authorize() against each model's Policy
-|      (the Policy itself just checks the Spatie permission, e.g.
-|      'suppliers.view') — this is the actual security boundary.
-|   2) No route-level `permission:` middleware is added redundantly here,
-|      to avoid maintaining the same rule in two places. If you prefer
-|      route-level middleware instead of Policies, you can swap freely;
-|      both approaches read from the same Spatie permissions.
+| Full route map for the car import/sales management system. Every
+| protected route sits behind 'auth:sanctum'; per-record and per-field
+| authorization is then enforced inside each Controller via its matching
+| Policy (see app/Providers/AuthServiceProvider.php for the full mapping).
 |
 */
 
 Route::prefix('auth')->group(function () {
-    // Public endpoints (throttled to slow down brute-force attempts)
+    // Public endpoints (throttled to slow down brute-force attempts).
+    // register() always creates a "customer" account — staff accounts
+    // (admin/agent/super-admin) are only ever created via POST /users.
     Route::middleware('throttle:auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login', [AuthController::class, 'login']);
     });
 
-    // Authenticated endpoints
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
@@ -54,7 +58,28 @@ Route::middleware('auth:sanctum')->get('/ping', function (\Illuminate\Http\Reque
 });
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    // ------------------------------------------------------------------
+    // أولاً: الموردين
+    // ------------------------------------------------------------------
     Route::apiResource('suppliers', SupplierController::class);
+
+    Route::apiResource('supplier-payments', SupplierPaymentController::class)
+        ->parameters(['supplier-payments' => 'supplier_payment']);
+
+    Route::apiResource('batches', BatchController::class);
+
+    // ------------------------------------------------------------------
+    // ثانيًا: السيارات
+    // ------------------------------------------------------------------
+    Route::apiResource('cars', CarController::class);
+    Route::get('cars/{car}/expenses', [CarController::class, 'expenses']);
+    Route::post('cars/{car}/expenses', [CarController::class, 'storeExpense']);
+
+    // وثائق السيارة (متداخلة، تعتمد على CarPolicy - راجع DocumentController)
+    Route::get('cars/{car}/documents', [DocumentController::class, 'index']);
+    Route::post('cars/{car}/documents', [DocumentController::class, 'store']);
+    Route::delete('cars/{car}/documents/{document}', [DocumentController::class, 'destroy']);
 
     Route::apiResource('container-openers', ContainerOpenerController::class)
         ->parameters(['container-openers' => 'container_opener']);
@@ -62,13 +87,60 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('service-providers', ServiceProviderController::class)
         ->parameters(['service-providers' => 'service_provider']);
 
-    Route::apiResource('batches', BatchController::class);
+    // ------------------------------------------------------------------
+    // ثالثًا: العملاء
+    // ------------------------------------------------------------------
+    Route::apiResource('customers', CustomerController::class);
 
-    Route::apiResource('cars', CarController::class);
-    Route::get('cars/{car}/expenses', [CarController::class, 'expenses']);
-    Route::post('cars/{car}/expenses', [CarController::class, 'storeExpense']);
+    // ------------------------------------------------------------------
+    // رابعًا: الوكلاء
+    // ------------------------------------------------------------------
+    Route::apiResource('agents', AgentController::class);
+    Route::get('agents/{agent}/customers', [AgentController::class, 'customers']);
+    Route::get('agents/{agent}/statement', [AgentController::class, 'statement']);
 
-    Route::apiResource('supplier-payments', SupplierPaymentController::class)
-        ->parameters(['supplier-payments' => 'supplier_payment']);
+    // ------------------------------------------------------------------
+    // خامسًا: الطلبات
+    // ------------------------------------------------------------------
+    Route::apiResource('orders', OrderController::class);
+    // Dedicated status-transition endpoint, separate from the general
+    // update() — enforces the strict forward-only workflow (see
+    // UpdateOrderStatusRequest), which a generic PATCH must not bypass.
+    Route::patch('orders/{order}/status', [OrderController::class, 'changeStatus']);
+
+    // ------------------------------------------------------------------
+    // سادسًا: الدفعات المالية
+    // ------------------------------------------------------------------
+    Route::apiResource('customer-payments', CustomerPaymentController::class)
+        ->parameters(['customer-payments' => 'customer_payment'])
+        ->except(['update']); // financial records are corrected via void+recreate, not PUT/PATCH replace
+    Route::post('customer-payments/{customer_payment}/remit', [CustomerPaymentController::class, 'remit']);
+
+    Route::apiResource('agent-transactions', AgentTransactionController::class)
+        ->parameters(['agent-transactions' => 'agent_transaction'])
+        ->except(['update']);
+
+    // ------------------------------------------------------------------
+    // سابعًا: الفواتير والمصاريف والمستندات
+    // ------------------------------------------------------------------
+    Route::apiResource('invoices', InvoiceController::class)->except(['update']);
+    Route::post('invoices/{invoice}/refresh', [InvoiceController::class, 'refresh']);
+
+    Route::apiResource('expenses', ExpenseController::class);
+
+    // ------------------------------------------------------------------
+    // ثامنًا: لوحة الإحصائيات
+    // ------------------------------------------------------------------
+    Route::get('dashboard', [DashboardController::class, 'index']);
+
+    // ------------------------------------------------------------------
+    // عاشرًا: إدارة المستخدمين والصلاحيات
+    // ------------------------------------------------------------------
+    Route::apiResource('users', UserController::class);
+    Route::patch('users/{user}/role', [UserController::class, 'changeRole']);
+    Route::patch('users/{user}/toggle-active', [UserController::class, 'toggleActive']);
+    Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
+
+    // إعدادات النظام العامة
+    Route::apiResource('settings', SettingController::class);
 });
-

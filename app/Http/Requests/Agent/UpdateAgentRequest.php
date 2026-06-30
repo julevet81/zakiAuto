@@ -24,9 +24,7 @@ class UpdateAgentRequest extends FormRequest
             'address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'user_id' => [
-                'nullable',
-                'integer',
-                'exists:users,id',
+                'nullable', 'integer', 'exists:users,id',
                 Rule::unique('agents', 'user_id')->ignore($this->route('agent')),
             ],
         ];

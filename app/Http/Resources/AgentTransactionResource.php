@@ -25,14 +25,14 @@ class AgentTransactionResource extends JsonResource
             'current_balence' => (float) $this->current_balence,
 
             'payment_id' => $this->payment_id,
-            'customer_payment' => $this->whenLoaded('customerPayment', fn() => $this->customerPayment ? [
+            'customer_payment' => $this->whenLoaded('customerPayment', fn () => $this->customerPayment ? [
                 'id' => $this->customerPayment->id,
                 'order_id' => $this->customerPayment->order_id,
                 'amount' => (float) $this->customerPayment->amount,
             ] : null),
 
             'transaction_id' => $this->transaction_id,
-            'treasury_transaction' => $this->whenLoaded('treasuryTransaction', fn() => $this->treasuryTransaction ? [
+            'treasury_transaction' => $this->whenLoaded('treasuryTransaction', fn () => $this->treasuryTransaction ? [
                 'id' => $this->treasuryTransaction->id,
                 'direction' => $this->treasuryTransaction->direction,
                 'amount' => (float) $this->treasuryTransaction->amount,
@@ -44,7 +44,7 @@ class AgentTransactionResource extends JsonResource
             'notes' => $this->notes,
 
             'created_by' => $this->created_by,
-            'creator' => $this->whenLoaded('creator', fn() => [
+            'creator' => $this->whenLoaded('creator', fn () => [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,
             ]),

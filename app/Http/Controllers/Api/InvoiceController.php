@@ -24,7 +24,7 @@ class InvoiceController extends Controller
         // Same scoping pattern as OrderController: a customer without
         // full orders.view only ever sees invoices for their own orders.
         if (! $user->can('orders.view')) {
-            $query->whereHas('order', fn($q) => $q->where('customer_id', $user->customer?->id ?? 0));
+            $query->whereHas('order', fn ($q) => $q->where('customer_id', $user->customer?->id ?? 0));
         }
 
         $invoices = $query->orderByDesc('id')->paginate($request->integer('per_page', 15));
@@ -111,7 +111,7 @@ class InvoiceController extends Controller
     protected function generateInvoiceNumber(): string
     {
         do {
-            $candidate = 'INV-' . now()->format('Y') . '-' . Str::upper(Str::random(6));
+            $candidate = 'INV-'.now()->format('Y').'-'.Str::upper(Str::random(6));
         } while (Invoice::where('invoice_number', $candidate)->exists());
 
         return $candidate;

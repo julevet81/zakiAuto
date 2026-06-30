@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Http\Resources\AgentTransactionResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -27,18 +26,18 @@ class AgentResource extends JsonResource
 
             'customers_count' => $this->when(
                 isset($this->customers_count) || $this->relationLoaded('customers'),
-                fn() => $this->customers_count ?? $this->customers->count()
+                fn () => $this->customers_count ?? $this->customers->count()
             ),
             'orders_count' => $this->when(
                 isset($this->orders_count) || $this->relationLoaded('orders'),
-                fn() => $this->orders_count ?? $this->orders->count()
+                fn () => $this->orders_count ?? $this->orders->count()
             ),
 
             // The agent's running ledger balance — only computed when
             // explicitly requested, since it queries the full ledger.
             'current_balance' => $this->when(
                 $request->boolean('with_stats'),
-                fn() => $this->current_balance
+                fn () => $this->current_balance
             ),
 
             'customers' => CustomerMiniResource::collection($this->whenLoaded('customers')),

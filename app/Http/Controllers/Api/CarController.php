@@ -30,12 +30,12 @@ class CarController extends Controller
         $canSeeOperationalData = $user->can('suppliers.view');
 
         $query = Car::query()
-            ->when($canSeeOperationalData, fn($q) => $q->with(['supplier', 'containerOpener']))
-            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))
-            ->when($request->filled('batch_id'), fn($q) => $q->where('batch_id', $request->integer('batch_id')))
-            ->when($request->filled('supplier_id') && $canSeeOperationalData, fn($q) => $q->where('supplier_id', $request->integer('supplier_id')))
-            ->when($request->filled('vin'), fn($q) => $q->where('vin', $request->string('vin')))
+            ->when($canSeeOperationalData, fn ($q) => $q->with(['supplier', 'containerOpener']))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('brand'), fn ($q) => $q->where('brand', 'like', '%'.$request->string('brand').'%'))
+            ->when($request->filled('batch_id'), fn ($q) => $q->where('batch_id', $request->integer('batch_id')))
+            ->when($request->filled('supplier_id') && $canSeeOperationalData, fn ($q) => $q->where('supplier_id', $request->integer('supplier_id')))
+            ->when($request->filled('vin'), fn ($q) => $q->where('vin', $request->string('vin')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
                 $q->where(function ($q) use ($term) {
@@ -46,7 +46,7 @@ class CarController extends Controller
             })
             // Anyone without operational visibility (agent/customer) is
             // browsing a sales catalogue: exclude already-sold cars.
-            ->when(! $canSeeOperationalData, fn($q) => $q->whereNotIn('status', [Car::STATUS_SOLD]))
+            ->when(! $canSeeOperationalData, fn ($q) => $q->whereNotIn('status', [Car::STATUS_SOLD]))
             ->orderByDesc('id');
 
         $cars = $query->paginate($request->integer('per_page', 15));

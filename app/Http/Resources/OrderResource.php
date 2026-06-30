@@ -2,8 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Http\Resources\CustomerPaymentResource;
-use App\Http\Resources\InvoiceResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -44,7 +42,7 @@ class OrderResource extends JsonResource
             'notes' => $this->notes,
 
             'created_by' => $this->created_by,
-            'creator' => $this->whenLoaded('creator', fn() => [
+            'creator' => $this->whenLoaded('creator', fn () => [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,
             ]),

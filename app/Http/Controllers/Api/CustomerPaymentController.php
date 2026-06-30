@@ -30,14 +30,14 @@ class CustomerPaymentController extends Controller
 
         $query = CustomerPayment::query()
             ->with(['customer', 'agent'])
-            ->when($request->filled('order_id'), fn($q) => $q->where('order_id', $request->integer('order_id')))
-            ->when($request->filled('date_from'), fn($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('payment_date', '<=', $request->date('date_to')));
+            ->when($request->filled('order_id'), fn ($q) => $q->where('order_id', $request->integer('order_id')))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('payment_date', '<=', $request->date('date_to')));
 
         if ($user->can('customer_payments.view')) {
             $query
-                ->when($request->filled('customer_id'), fn($q) => $q->where('customer_id', $request->integer('customer_id')))
-                ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')))
+                ->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', $request->integer('customer_id')))
+                ->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')))
                 ->when($request->filled('is_remitted'), function ($q) use ($request) {
                     $request->boolean('is_remitted')
                         ? $q->whereNotNull('remittance_id')
@@ -215,7 +215,7 @@ class CustomerPaymentController extends Controller
                 'transaction_id' => null,
                 'transaction_date' => $date,
                 'attachment' => $request->input('attachment'),
-                'notes' => $request->input('notes', 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' للخزينة'),
+                'notes' => $request->input('notes', 'تحويل دفعة عميل رقم #'.$customerPayment->id.' للخزينة'),
                 'created_by' => $userId,
             ]);
 
@@ -232,7 +232,7 @@ class CustomerPaymentController extends Controller
                 'source_type' => TreasuryTransaction::SOURCE_AGENT_REMITTANCE,
                 'source_id' => $agentTransaction->id,
                 'transaction_date' => $date,
-                'notes' => 'تحويل دفعة عميل من الوكيل: ' . ($customerPayment->agent?->name ?? $customerPayment->agent_id),
+                'notes' => 'تحويل دفعة عميل من الوكيل: '.($customerPayment->agent?->name ?? $customerPayment->agent_id),
                 'created_by' => $userId,
             ]);
 
@@ -266,7 +266,7 @@ class CustomerPaymentController extends Controller
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $payment->id,
             'transaction_date' => $payment->payment_date,
-            'notes' => 'دفعة من العميل: ' . ($payment->customer?->name ?? $payment->customer_id),
+            'notes' => 'دفعة من العميل: '.($payment->customer?->name ?? $payment->customer_id),
             'created_by' => $userId,
         ]);
     }
@@ -292,7 +292,7 @@ class CustomerPaymentController extends Controller
             'current_balence' => $newBalance,
             'payment_id' => $payment->id,
             'transaction_date' => $payment->payment_date,
-            'notes' => 'قبض دفعة عميل رقم #' . $payment->id . ' لم تُحوَّل للخزينة بعد',
+            'notes' => 'قبض دفعة عميل رقم #'.$payment->id.' لم تُحوَّل للخزينة بعد',
             'created_by' => $userId,
         ]);
     }
@@ -314,7 +314,7 @@ class CustomerPaymentController extends Controller
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $payment->id,
             'transaction_date' => now()->toDateString(),
-            'notes' => 'إلغاء دفعة عميل محذوفة رقم #' . $payment->id,
+            'notes' => 'إلغاء دفعة عميل محذوفة رقم #'.$payment->id,
             'created_by' => $payment->created_by,
         ]);
     }
@@ -340,7 +340,7 @@ class CustomerPaymentController extends Controller
             'current_balence' => $newBalance,
             'payment_id' => $payment->id,
             'transaction_date' => now()->toDateString(),
-            'notes' => 'إلغاء قبض دفعة عميل محذوفة رقم #' . $payment->id,
+            'notes' => 'إلغاء قبض دفعة عميل محذوفة رقم #'.$payment->id,
             'created_by' => $payment->created_by,
         ]);
     }

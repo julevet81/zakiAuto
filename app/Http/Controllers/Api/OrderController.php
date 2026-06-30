@@ -30,12 +30,12 @@ class OrderController extends Controller
 
         $query = Order::query()
             ->with(['customer', 'car', 'agent'])
-            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')));
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')));
 
         if ($user->can('orders.view')) {
             $query
-                ->when($request->filled('customer_id'), fn($q) => $q->where('customer_id', $request->integer('customer_id')))
-                ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
+                ->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', $request->integer('customer_id')))
+                ->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')));
         } elseif ($user->can('orders.view_assigned')) {
             $query->where('agent_id', $user->agent?->id ?? 0);
         } elseif ($user->can('orders.view_own')) {
@@ -186,7 +186,7 @@ class OrderController extends Controller
     protected function generateOrderNumber(): string
     {
         do {
-            $candidate = 'ORD-' . now()->format('Y') . '-' . Str::upper(Str::random(6));
+            $candidate = 'ORD-'.now()->format('Y').'-'.Str::upper(Str::random(6));
         } while (Order::where('order_number', $candidate)->exists());
 
         return $candidate;

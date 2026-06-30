@@ -32,15 +32,11 @@ class StoreCustomerRequest extends FormRequest
             // (see CustomerController::store) — they cannot assign a
             // customer to a different agent or to themselves explicitly.
             'agent_id' => [
-                'nullable',
-                'integer',
-                'exists:agents,id',
+                'nullable', 'integer', 'exists:agents,id',
                 Rule::prohibitIf(! $this->user()->can('customers.view')),
             ],
             'user_id' => [
-                'nullable',
-                'integer',
-                'exists:users,id',
+                'nullable', 'integer', 'exists:users,id',
                 Rule::unique('customers', 'user_id'),
                 Rule::prohibitIf(! $this->user()->can('customers.view')),
             ],

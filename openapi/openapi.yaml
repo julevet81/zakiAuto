@@ -1,0 +1,2005 @@
+openapi: 3.0.3
+info:
+  title: نظام إدارة استيراد وبيع السيارات - API
+  description: |
+    واجهة برمجية كاملة لإدارة عمليات استيراد وبيع السيارات: الموردين، السيارات،
+    العملاء، الوكلاء، الطلبات، الدفعات المالية، الفواتير، والإحصائيات.
+
+    ## الأدوار والصلاحيات
+    - **super-admin**: صلاحية كاملة على كل أجزاء النظام، بما فيها أسعار الشراء
+      والشحن والربح لكل سيارة، وإدارة الأدوار والصلاحيات.
+    - **admin**: صلاحية كاملة على كل أجزاء النظام **ما عدا** أسعار الشراء
+      والشحن وأرباح كل سيارة (`cars.view_cost`, `reports.view_profit`).
+    - **agent**: الوصول فقط لعملائه وطلباته وكشف حسابه الخاص.
+    - **customer**: عرض طلباته وفواتيره ودفعاته فقط.
+
+    ## المصادقة
+    كل المسارات (عدا `/auth/register` و `/auth/login`) تتطلب
+    `Authorization: Bearer <token>` تم الحصول عليه من تسجيل الدخول.
+  version: 1.0.0
+  contact:
+    name: فريق التطوير
+
+servers:
+  - url: http://localhost:8000/api
+    description: بيئة التطوير المحلية
+  - url: https://your-domain.com/api
+    description: بيئة الإنتاج (عدّل الرابط)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: تسجيل الدخول، التسجيل، الجلسة الحالية
+  - name: Suppliers
+    description: إدارة الموردين
+  - name: SupplierPayments
+    description: دفعات الموردين
+  - name: Batches
+    description: دفعات الاستيراد (الحاويات)
+  - name: Cars
+    description: إدارة السيارات
+  - name: ContainerOpeners
+    description: جهات فتح الحاويات
+  - name: ServiceProviders
+    description: مزودو الخدمات
+  - name: Customers
+    description: إدارة العملاء
+  - name: Agents
+    description: إدارة الوكلاء وكشوف حساباتهم
+  - name: Orders
+    description: الطلبات وحالاتها
+  - name: CustomerPayments
+    description: دفعات العملاء
+  - name: AgentTransactions
+    description: حركات حساب الوكلاء
+  - name: Expenses
+    description: المصاريف العامة
+  - name: Invoices
+    description: الفواتير
+  - name: Documents
+    description: مستندات السيارات
+  - name: Dashboard
+    description: الإحصائيات العامة
+  - name: Users
+    description: إدارة المستخدمين والأدوار
+  - name: Settings
+    description: إعدادات النظام
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum Personal Access Token
+      description: "تسجّل دخول عبر /auth/login وتستخدم التوكن المُستلم: Authorization: Bearer <token>"
+
+  parameters:
+    PerPage:
+      name: per_page
+      in: query
+      description: عدد العناصر في الصفحة
+      schema:
+        type: integer
+        default: 15
+    Page:
+      name: page
+      in: query
+      description: رقم الصفحة
+      schema:
+        type: integer
+        default: 1
+    SearchParam:
+      name: search
+      in: query
+      description: بحث نصي
+      schema:
+        type: string
+
+  responses:
+    Unauthenticated:
+      description: غير مسجل الدخول
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Unauthenticated.
+    Forbidden:
+      description: لا تملك الصلاحية اللازمة
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: لا تملك الصلاحية اللازمة للقيام بهذا الإجراء
+    NotFound:
+      description: السجل غير موجود
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: لا يوجد سجل بهذا المعرف
+    ValidationError:
+      description: خطأ في التحقق من صحة البيانات
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: The given data was invalid.
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        batches_count:
+          type: integer
+        cars_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    Car:
+      type: object
+      properties:
+        id:
+          type: integer
+        batch_id:
+          type: integer
+          nullable: true
+          description: مرئي فقط لمن يملك صلاحية suppliers.view
+        supplier_id:
+          type: integer
+          nullable: true
+        brand:
+          type: string
+        model:
+          type: string
+        finition:
+          type: string
+          nullable: true
+        manufacture_year:
+          type: integer
+        color:
+          type: string
+          nullable: true
+        vin:
+          type: string
+          nullable: true
+        foreign_purchase_price:
+          type: number
+          nullable: true
+          description: مرئي فقط لمن يملك صلاحية cars.view_cost (super-admin)
+        sale_price:
+          type: number
+        status:
+          type: string
+          enum: [available, reserved, shipping, arrived, delivered, sold]
+        is_sold:
+          type: boolean
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        agent_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        national_id:
+          type: string
+          nullable: true
+        passport_no:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        current_balance:
+          type: number
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        order_number:
+          type: string
+        customer_id:
+          type: integer
+        car_id:
+          type: integer
+        agent_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [new, purchased, shipping, arrived_at_port, ready_for_delivery, delivered]
+        status_label:
+          type: string
+        paid_amount:
+          type: number
+        remaining_amount:
+          type: number
+        notes:
+          type: string
+          nullable: true
+
+    CustomerPayment:
+      type: object
+      properties:
+        id:
+          type: integer
+        order_id:
+          type: integer
+        customer_id:
+          type: integer
+        amount:
+          type: number
+        received_by:
+          type: string
+          enum: [company, agent]
+        agent_id:
+          type: integer
+          nullable: true
+        remittance_id:
+          type: integer
+          nullable: true
+        is_remitted:
+          type: boolean
+        payment_date:
+          type: string
+          format: date
+
+    AgentTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        agent_id:
+          type: integer
+        direction:
+          type: string
+          enum: [in, out]
+        amount:
+          type: number
+        previous_balence:
+          type: number
+        current_balence:
+          type: number
+        transaction_date:
+          type: string
+          format: date
+        notes:
+          type: string
+          nullable: true
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+
+    DashboardStats:
+      type: object
+      properties:
+        customers_count:
+          type: integer
+        suppliers_count:
+          type: integer
+        cars_count:
+          type: integer
+        orders_count:
+          type: integer
+        agents_count:
+          type: integer
+        total_sales:
+          type: number
+        total_commissions:
+          type: number
+        total_purchase_cost:
+          type: number
+          description: super-admin فقط (reports.view_profit)
+        total_expenses:
+          type: number
+          description: super-admin فقط (reports.view_profit)
+        total_profit:
+          type: number
+          description: super-admin فقط (reports.view_profit)
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: تسجيل حساب عميل جديد
+      description: ينشئ دائمًا حسابًا بدور customer مع سجل Customer مرتبط.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name:
+                  type: string
+                  example: أحمد محمد
+                email:
+                  type: string
+                  example: ahmed@example.com
+                phone:
+                  type: string
+                  example: "0555123456"
+                password:
+                  type: string
+                  example: password123
+                password_confirmation:
+                  type: string
+                  example: password123
+      responses:
+        '201':
+          description: تم إنشاء الحساب بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: تسجيل الدخول
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: superadmin@example.com
+                password:
+                  type: string
+                  example: ChangeMe123!
+                device_name:
+                  type: string
+                  example: web-dashboard
+      responses:
+        '200':
+          description: تم تسجيل الدخول بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+        '422':
+          description: بيانات الدخول غير صحيحة أو الحساب معطل
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ValidationError'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: بيانات المستخدم الحالي مع أدواره وصلاحياته
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: تسجيل الخروج (هذا الجهاز فقط)
+      responses:
+        '200':
+          description: تم تسجيل الخروج بنجاح
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: تسجيل الخروج من جميع الأجهزة
+      responses:
+        '200':
+          description: تم تسجيل الخروج من جميع الأجهزة بنجاح
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /ping:
+    get:
+      tags: [Auth]
+      summary: فحص سريع لصحة المصادقة والأدوار
+      responses:
+        '200':
+          description: pong
+
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: قائمة الموردين
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Supplier'
+                  meta:
+                    $ref: '#/components/schemas/Pagination'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Suppliers]
+      summary: إضافة مورد جديد
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                address:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: تم إضافة المورد بنجاح
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /suppliers/{supplier}:
+    parameters:
+      - name: supplier
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Suppliers]
+      summary: عرض مورد مع سياراته وطلباته ودفعاته
+      responses:
+        '200':
+          description: نجح
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Suppliers]
+      summary: تحديث بيانات مورد
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                address:
+                  type: string
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Suppliers]
+      summary: حذف مورد (يُرفض إن وُجدت سيارات أو دفعات مرتبطة)
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود سجلات مرتبطة
+
+  /supplier-payments:
+    get:
+      tags: [SupplierPayments]
+      summary: قائمة دفعات الموردين
+      parameters:
+        - name: supplier_id
+          in: query
+          schema:
+            type: integer
+        - name: batch_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [SupplierPayments]
+      summary: تسجيل دفعة لمورد على دفعة استيراد محددة
+      description: |
+        ينشئ تلقائيًا حركة خزينة (out)، ويعيد حساب total_paid_amount_foreign
+        للدفعة، ويرقّي حالتها من pending إلى partial عند أول دفعة.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batch_id, supplier_id, amount_foreign, exchange_rate, payment_date]
+              properties:
+                batch_id:
+                  type: integer
+                supplier_id:
+                  type: integer
+                amount_foreign:
+                  type: number
+                exchange_rate:
+                  type: number
+                amount_local:
+                  type: number
+                  description: يُحسب تلقائيًا إن لم يُرسَل
+                payment_date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: تم تسجيل دفعة المورد بنجاح
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /supplier-payments/{supplier_payment}:
+    parameters:
+      - name: supplier_payment
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [SupplierPayments]
+      summary: عرض دفعة مورد
+      responses:
+        '200':
+          description: نجح
+    patch:
+      tags: [SupplierPayments]
+      summary: تعديل دفعة مورد (يُعيد حساب إجمالي الدفعة وخزينة الشركة)
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [SupplierPayments]
+      summary: حذف دفعة مورد (يُسجّل حركة خزينة عكسية)
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف إن كانت الدفعة مُحوَّلة بالفعل
+
+  /batches:
+    get:
+      tags: [Batches]
+      summary: قائمة دفعات الاستيراد
+      parameters:
+        - name: supplier_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, partial, fully_paid, cost_allocated]
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [Batches]
+      summary: إنشاء دفعة استيراد جديدة
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [supplier_id, batch_number, exchange_rate]
+              properties:
+                supplier_id:
+                  type: integer
+                batch_number:
+                  type: string
+                purchase_date:
+                  type: string
+                  format: date
+                exchange_rate:
+                  type: number
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: تم إنشاء دفعة الاستيراد بنجاح
+
+  /batches/{batch}:
+    parameters:
+      - name: batch
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Batches]
+      summary: عرض دفعة استيراد مع سياراتها ودفعاتها
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [Batches]
+      summary: تحديث دفعة استيراد (يشمل تحديث الحالة يدويًا)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, partial, fully_paid, cost_allocated]
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Batches]
+      summary: حذف دفعة استيراد
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود سيارات أو دفعات مرتبطة
+
+  /cars:
+    get:
+      tags: [Cars]
+      summary: قائمة السيارات (كتالوج للعميل/الوكيل، بيانات كاملة للموظفين)
+      description: |
+        - super-admin: يرى كل البيانات بما فيها التكلفة والربح.
+        - admin: يرى كل البيانات التشغيلية (المورد...) لكن بدون التكلفة.
+        - agent/customer: يرى فقط العلامة/الموديل/سعر البيع، والسيارات غير المباعة فقط.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, reserved, shipping, arrived, delivered, sold]
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: vin
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Car'
+    post:
+      tags: [Cars]
+      summary: إضافة سيارة جديدة
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batch_id, supplier_id, brand, model, manufacture_year, foreign_purchase_price, sale_price]
+              properties:
+                batch_id:
+                  type: integer
+                supplier_id:
+                  type: integer
+                container_opener_id:
+                  type: integer
+                brand:
+                  type: string
+                model:
+                  type: string
+                manufacture_year:
+                  type: integer
+                color:
+                  type: string
+                vin:
+                  type: string
+                foreign_purchase_price:
+                  type: number
+                sale_price:
+                  type: number
+      responses:
+        '201':
+          description: تم إضافة السيارة بنجاح
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /cars/{car}:
+    parameters:
+      - name: car
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Cars]
+      summary: عرض سيارة
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Car'
+    put:
+      tags: [Cars]
+      summary: تحديث بيانات سيارة (يشمل تغيير الحالة)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [available, reserved, shipping, arrived, delivered, sold]
+                sale_price:
+                  type: number
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Cars]
+      summary: حذف سيارة
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود طلب مرتبط بها
+
+  /cars/{car}/expenses:
+    parameters:
+      - name: car
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Cars]
+      summary: قائمة تكاليف السيارة (super-admin فقط - cars.view_cost)
+      responses:
+        '200':
+          description: نجح
+        '403':
+          description: متاحة فقط لمن يملك صلاحية cars.view_cost
+    post:
+      tags: [Cars]
+      summary: إضافة تكلفة على سيارة (شحن، رسوم، إصلاح...)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expense_type, foreign_amount, local_amount]
+              properties:
+                expense_type:
+                  type: string
+                foreign_amount:
+                  type: number
+                local_amount:
+                  type: number
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: تم إضافة المصروف بنجاح
+
+  /cars/{car}/documents:
+    parameters:
+      - name: car
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Documents]
+      summary: قائمة وثائق السيارة
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [Documents]
+      summary: إضافة وثيقة لسيارة
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, file_path]
+              properties:
+                title:
+                  type: string
+                file_path:
+                  type: string
+      responses:
+        '201':
+          description: تم إضافة الوثيقة بنجاح
+
+  /cars/{car}/documents/{document}:
+    parameters:
+      - name: car
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: document
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      tags: [Documents]
+      summary: حذف وثيقة من سيارة
+      responses:
+        '200':
+          description: تم حذف الوثيقة بنجاح
+        '404':
+          description: الوثيقة لا تعود لهذه السيارة
+
+  /container-openers:
+    get:
+      tags: [ContainerOpeners]
+      summary: قائمة جهات فتح الحاويات
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [ContainerOpeners]
+      summary: إضافة جهة فتح حاويات
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                nif:
+                  type: string
+      responses:
+        '201':
+          description: تم الإضافة بنجاح
+
+  /container-openers/{container_opener}:
+    parameters:
+      - name: container_opener
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [ContainerOpeners]
+      summary: عرض جهة فتح حاويات
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [ContainerOpeners]
+      summary: تحديث جهة فتح حاويات
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [ContainerOpeners]
+      summary: حذف جهة فتح حاويات
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+
+  /service-providers:
+    get:
+      tags: [ServiceProviders]
+      summary: قائمة مزودي الخدمات
+      parameters:
+        - name: provider_type
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [ServiceProviders]
+      summary: إضافة مزود خدمة
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, provider_type]
+              properties:
+                name:
+                  type: string
+                provider_type:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        '201':
+          description: تم الإضافة بنجاح
+
+  /service-providers/{service_provider}:
+    parameters:
+      - name: service_provider
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [ServiceProviders]
+      summary: عرض مزود خدمة
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [ServiceProviders]
+      summary: تحديث مزود خدمة
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [ServiceProviders]
+      summary: حذف مزود خدمة
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+
+  /customers:
+    get:
+      tags: [Customers]
+      summary: قائمة العملاء (admin يرى الكل، agent يرى عملاءه فقط)
+      parameters:
+        - name: agent_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+    post:
+      tags: [Customers]
+      summary: إضافة عميل (وكيل ينشئ عميلًا يُربط تلقائيًا به)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                national_id:
+                  type: string
+                agent_id:
+                  type: integer
+                  description: admin فقط - الوكيل يُربط تلقائيًا بنفسه
+      responses:
+        '201':
+          description: تم إضافة العميل بنجاح
+
+  /customers/{customer}:
+    parameters:
+      - name: customer
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Customers]
+      summary: عرض عميل مع طلباته ودفعاته
+      responses:
+        '200':
+          description: نجح
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Customers]
+      summary: تحديث بيانات عميل
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Customers]
+      summary: حذف عميل
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود طلبات مرتبطة
+
+  /agents:
+    get:
+      tags: [Agents]
+      summary: قائمة الوكلاء (admin فقط)
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Agent'
+    post:
+      tags: [Agents]
+      summary: إضافة وكيل
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                user_id:
+                  type: integer
+                  description: لربط حساب مستخدم موجود بهذا الوكيل
+      responses:
+        '201':
+          description: تم إضافة الوكيل بنجاح
+
+  /agents/{agent}:
+    parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Agents]
+      summary: عرض وكيل (الوكيل نفسه يرى ملفه الشخصي)
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [Agents]
+      summary: تحديث بيانات وكيل
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Agents]
+      summary: حذف وكيل
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود عملاء أو طلبات مرتبطة
+
+  /agents/{agent}/customers:
+    parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Agents]
+      summary: قائمة العملاء التابعين لوكيل (مطلوب صريح في المتطلبات)
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+
+  /agents/{agent}/statement:
+    parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Agents]
+      summary: كشف حساب الوكيل الكامل (مطلوب صريح في المتطلبات)
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      current_balance:
+                        type: number
+                  statement:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AgentTransaction'
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: قائمة الطلبات (admin يرى الكل، agent المرتبطة به، customer الخاصة به)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [new, purchased, shipping, arrived_at_port, ready_for_delivery, delivered]
+        - name: customer_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+    post:
+      tags: [Orders]
+      summary: إنشاء طلب جديد (يربط العميل بالسيارة، يجعل السيارة reserved)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, car_id]
+              properties:
+                customer_id:
+                  type: integer
+                car_id:
+                  type: integer
+                agent_id:
+                  type: integer
+                purchase_date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: تم إنشاء الطلب بنجاح
+        '422':
+          description: السيارة غير متاحة أو مرتبطة بطلب آخر
+
+  /orders/{order}:
+    parameters:
+      - name: order
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: عرض طلب
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+    put:
+      tags: [Orders]
+      summary: تحديث الحقول العامة للطلب (ليس الحالة)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_id:
+                  type: integer
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: تم تحديث الطلب بنجاح
+    delete:
+      tags: [Orders]
+      summary: حذف طلب (يحرر السيارة لتصبح available)
+      responses:
+        '200':
+          description: تم حذف الطلب بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود دفعات مسجلة
+
+  /orders/{order}/status:
+    parameters:
+      - name: order
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Orders]
+      summary: تغيير حالة الطلب (تسلسل صارم خطوة بخطوة فقط)
+      description: |
+        التسلسل الإلزامي: new → purchased → shipping → arrived_at_port →
+        ready_for_delivery → delivered. لا يمكن تخطي خطوة أو الرجوع للخلف.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [purchased, shipping, arrived_at_port, ready_for_delivery, delivered]
+                date:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: تم تحديث حالة الطلب بنجاح
+        '422':
+          description: لا يمكن تغيير الحالة مباشرة بدون اتباع التسلسل
+
+  /customer-payments:
+    get:
+      tags: [CustomerPayments]
+      summary: قائمة دفعات العملاء
+      parameters:
+        - name: order_id
+          in: query
+          schema:
+            type: integer
+        - name: is_remitted
+          in: query
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomerPayment'
+    post:
+      tags: [CustomerPayments]
+      summary: تسجيل دفعة عميل على طلب
+      description: |
+        - received_by=company: تدخل خزينة الشركة مباشرة (treasury "in").
+        - received_by=agent: تُسجَّل كدَين على الوكيل (agent_transactions "out")
+          حتى يتم تحويلها فعليًا عبر POST /customer-payments/{id}/remit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, customer_id, amount, received_by, payment_date]
+              properties:
+                order_id:
+                  type: integer
+                customer_id:
+                  type: integer
+                amount:
+                  type: number
+                received_by:
+                  type: string
+                  enum: [company, agent]
+                agent_id:
+                  type: integer
+                  description: مطلوب إن كان received_by=agent
+                payment_date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: تم تسجيل دفعة العميل بنجاح
+        '422':
+          description: المبلغ يتجاوز المتبقي على الطلب أو بيانات غير متطابقة
+
+  /customer-payments/{customer_payment}:
+    parameters:
+      - name: customer_payment
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [CustomerPayments]
+      summary: عرض دفعة عميل
+      responses:
+        '200':
+          description: نجح
+    delete:
+      tags: [CustomerPayments]
+      summary: حذف دفعة عميل (يُسجّل حركة عكسية في مصدرها)
+      responses:
+        '200':
+          description: تم حذف الدفعة بنجاح
+        '422':
+          description: لا يمكن الحذف إن كانت الدفعة مُحوَّلة للخزينة بالفعل
+
+  /customer-payments/{customer_payment}/remit:
+    parameters:
+      - name: customer_payment
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [CustomerPayments]
+      summary: تأكيد تحويل دفعة جمعها وكيل إلى خزينة الشركة
+      description: |
+        يُنشئ حركة "in" في AgentTransaction (تُصفّي دَين الوكيل) وحركة "in"
+        في TreasuryTransaction (الشركة تستلم المال فعليًا)، مترابطتين عبر
+        المفاتيح الدائرية الموجودة في الـ migration الأصلي.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction_date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: تم تأكيد التحويل بنجاح
+        '422':
+          description: الدفعة لم تُجمَع بواسطة وكيل، أو تم تحويلها مسبقًا
+
+  /agent-transactions:
+    get:
+      tags: [AgentTransactions]
+      summary: قائمة حركات حسابات الوكلاء
+      parameters:
+        - name: agent_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentTransaction'
+    post:
+      tags: [AgentTransactions]
+      summary: تسجيل حركة يدوية على حساب وكيل (عمولة، سحب، تصحيح)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id, direction, amount, transaction_date, notes]
+              properties:
+                agent_id:
+                  type: integer
+                direction:
+                  type: string
+                  enum: [in, out]
+                amount:
+                  type: number
+                transaction_date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+                  description: إلزامي - يجب توضيح سبب الحركة
+      responses:
+        '201':
+          description: تم تسجيل الحركة بنجاح
+
+  /agent-transactions/{agent_transaction}:
+    parameters:
+      - name: agent_transaction
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [AgentTransactions]
+      summary: عرض حركة
+      responses:
+        '200':
+          description: نجح
+    delete:
+      tags: [AgentTransactions]
+      summary: حذف حركة يدوية فقط (الحركات التلقائية تُحذف من مصدرها)
+      responses:
+        '200':
+          description: تم حذف الحركة بنجاح
+        '422':
+          description: لا يمكن حذف حركة ناتجة تلقائيًا عن دفعة أو تحويل
+
+  /expenses:
+    get:
+      tags: [Expenses]
+      summary: قائمة المصاريف العامة
+      parameters:
+        - name: car_id
+          in: query
+          schema:
+            type: integer
+        - name: order_id
+          in: query
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [Expenses]
+      summary: تسجيل مصروف (مرتبط بسيارة أو طلب على الأقل)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expense_type, amount, expense_date]
+              properties:
+                car_id:
+                  type: integer
+                order_id:
+                  type: integer
+                service_provider_id:
+                  type: integer
+                expense_type:
+                  type: string
+                amount:
+                  type: number
+                expense_date:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: تم تسجيل المصروف بنجاح
+
+  /expenses/{expense}:
+    parameters:
+      - name: expense
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Expenses]
+      summary: عرض مصروف
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [Expenses]
+      summary: تحديث مصروف
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Expenses]
+      summary: حذف مصروف
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+
+  /invoices:
+    get:
+      tags: [Invoices]
+      summary: قائمة الفواتير (customer يرى فواتير طلباته فقط)
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [Invoices]
+      summary: إنشاء فاتورة من طلب (تأخذ صورة من إجمالي/مدفوع/متبقي وقت الإنشاء)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id]
+              properties:
+                order_id:
+                  type: integer
+      responses:
+        '201':
+          description: تم إنشاء الفاتورة بنجاح
+        '422':
+          description: يوجد فاتورة لهذا الطلب مسبقًا
+
+  /invoices/{invoice}:
+    parameters:
+      - name: invoice
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Invoices]
+      summary: عرض فاتورة
+      responses:
+        '200':
+          description: نجح
+    delete:
+      tags: [Invoices]
+      summary: حذف فاتورة
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+
+  /invoices/{invoice}/refresh:
+    parameters:
+      - name: invoice
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Invoices]
+      summary: إعادة مزامنة الفاتورة مع حالة الطلب الحالية (بعد دفعة جديدة مثلًا)
+      responses:
+        '200':
+          description: تم تحديث الفاتورة بنجاح
+
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: الإحصائيات العامة
+      description: |
+        أرقام الربح (total_purchase_cost, total_expenses, total_profit) تظهر
+        فقط لمن يملك صلاحية reports.view_profit (super-admin فقط).
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DashboardStats'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: قائمة المستخدمين
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [super-admin, admin, agent, customer]
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [Users]
+      summary: إنشاء حساب موظف (admin/agent) - الطريقة الوحيدة لإنشائها
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, role]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum: [super-admin, admin, agent, customer]
+                agent:
+                  type: object
+                  description: مطلوب إن كان role=agent
+                  properties:
+                    name:
+                      type: string
+                    phone:
+                      type: string
+      responses:
+        '201':
+          description: تم إنشاء المستخدم بنجاح
+
+  /users/{user}:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Users]
+      summary: عرض مستخدم
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [Users]
+      summary: تحديث بيانات مستخدم (ليس الدور أو كلمة المرور)
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Users]
+      summary: حذف مستخدم (لا يمكن حذف حسابك الخاص)
+      responses:
+        '200':
+          description: تم الحذف بنجاح
+        '422':
+          description: لا يمكن الحذف لوجود سجلات مرتبطة كوكيل
+
+  /users/{user}/role:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Users]
+      summary: تغيير دور المستخدم (منح super-admin يتطلب أن يكون الطالب نفسه super-admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [super-admin, admin, agent, customer]
+      responses:
+        '200':
+          description: تم تحديث دور المستخدم بنجاح
+        '422':
+          description: فقط super-admin يمكنه منح أو سحب دور super-admin
+
+  /users/{user}/toggle-active:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+    patch:
+      tags: [Users]
+      summary: تفعيل/تعطيل حساب مستخدم
+      responses:
+        '200':
+          description: تم تغيير حالة الحساب بنجاح
+
+  /users/{user}/reset-password:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Users]
+      summary: إعادة تعيين كلمة مرور مستخدم (يُلغي كل جلساته الحالية)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: تم إعادة تعيين كلمة المرور بنجاح
+
+  /settings:
+    get:
+      tags: [Settings]
+      summary: قائمة إعدادات النظام
+      responses:
+        '200':
+          description: نجح
+    post:
+      tags: [Settings]
+      summary: إضافة إعداد جديد
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value]
+              properties:
+                key:
+                  type: string
+                value:
+                  type: string
+      responses:
+        '201':
+          description: تم إضافة الإعداد بنجاح
+
+  /settings/{setting}:
+    parameters:
+      - name: setting
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Settings]
+      summary: عرض إعداد
+      responses:
+        '200':
+          description: نجح
+    put:
+      tags: [Settings]
+      summary: تحديث قيمة إعداد (المفتاح غير قابل للتعديل)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  type: string
+      responses:
+        '200':
+          description: تم التحديث بنجاح
+    delete:
+      tags: [Settings]
+      summary: حذف إعداد
+      responses:
+        '200':
+          description: تم الحذف بنجاح
