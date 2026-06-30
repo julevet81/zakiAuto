@@ -55,6 +55,7 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers')->onDelete('cascade');
             $table->string('batch_number', 30)->unique();
             $table->date('purchase_date')->nullable();
+            $table->decimal('total_cost_foreign', 15, 2)->default(0);
             $table->decimal('total_paid_amount_foreign', 15, 2)->default(0);
             $table->decimal('exchange_rate', 15, 4);
             $table->string('status', 50)->default('pending'); // pending, partial, fully_paid, cost_allocated

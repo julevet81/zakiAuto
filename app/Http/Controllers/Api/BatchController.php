@@ -32,7 +32,13 @@ class BatchController extends Controller
 
     public function store(StoreBatchRequest $request): JsonResponse
     {
-        $batch = Batch::create($request->validated() + ['status' => $request->input('status', Batch::STATUS_PENDING)]);
+        $batch = Batch::create(
+            $request->validated()
+            + ['status' => $request->input('status', Batch::STATUS_PENDING)]
+        );
+
+        // exchange_rate stays NULL at creation — no payments exist yet.
+        // It will be computed the first time a supplier_payment is saved.
 
         return response()->json([
             'message' => 'تم إنشاء دفعة الاستيراد بنجاح',
@@ -55,9 +61,17 @@ class BatchController extends Controller
     {
         $batch->update($request->validated());
 
+        // If total_cost_foreign was changed, the exchange_rate formula's
+        // denominator has changed — recompute immediately so the stored
+        // value stays consistent with the new target cost, even if no
+        // new payment was recorded in this request.
+        if ($request->has('total_cost_foreign')) {
+            $batch->recomputeExchangeRate(save: true);
+        }
+
         return response()->json([
             'message' => 'تم تحديث دفعة الاستيراد بنجاح',
-            'data' => new BatchResource($batch->load('supplier')),
+            'data' => new BatchResource($batch->fresh(['supplier'])),
         ]);
     }
 

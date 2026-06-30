@@ -19,14 +19,20 @@ class UpdateBatchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'supplier_id' => ['sometimes', 'required', 'integer', 'exists:suppliers,id'],
-            'batch_number' => [
+            'supplier_id'   => ['sometimes', 'required', 'integer', 'exists:suppliers,id'],
+            'batch_number'  => [
                 'sometimes', 'required', 'string', 'max:30',
                 Rule::unique('batches', 'batch_number')->ignore($this->route('batch')),
             ],
             'purchase_date' => ['nullable', 'date'],
-            'total_paid_amount_foreign' => ['nullable', 'numeric', 'min:0'],
-            'exchange_rate' => ['sometimes', 'required', 'numeric', 'min:0'],
+
+            // Updating total_cost_foreign triggers an automatic
+            // recomputeExchangeRate() call in BatchController::update()
+            // since the denominator of the formula has changed.
+            'total_cost_foreign' => ['nullable', 'numeric', 'min:0'],
+
+            // exchange_rate is computed, never user-editable.
+
             'status' => ['nullable', Rule::in([
                 Batch::STATUS_PENDING,
                 Batch::STATUS_PARTIAL,

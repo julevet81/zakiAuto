@@ -23,7 +23,7 @@ class SupplierPaymentController extends Controller
         $this->authorize('viewAny', SupplierPayment::class);
 
         $payments = SupplierPayment::query()
-            ->with(['supplier:id,name,phone', 'batch:id,batch_number,status'])
+            ->with(['supplier:id,name,phone', 'batch:id,batch_number,status,exchange_rate'])
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->integer('supplier_id')))
             ->when($request->filled('batch_id'), fn ($q) => $q->where('batch_id', $request->integer('batch_id')))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
@@ -38,43 +38,44 @@ class SupplierPaymentController extends Controller
     /**
      * Record a new payment to a supplier against one of their import batches.
      *
-     * This performs four things atomically:
-     *   1. Create the supplier_payments row (amount_local auto-computed
-     *      from amount_foreign * exchange_rate if not given explicitly).
-     *   2. Recompute the batch's running total_paid_amount_foreign from
-     *      the sum of ALL its payments (never trust a client-sent total).
-     *   3. Advance the batch status pending -> partial on first payment
-     *      only. We deliberately do NOT auto-mark a batch "fully_paid",
-     *      since `batches` has no "total cost" column to compare against
-     *      — see SUPPLIER_PAYMENTS_NOTE.md. That transition stays manual.
-     *   4. Post a matching "out" movement to the company treasury ledger,
-     *      chained off the previous treasury balance so the running
-     *      balance is always correct.
+     * Atomically:
+     *   1. Creates the supplier_payments row (amount_local = amount_foreign
+     *      × exchange_rate unless overridden explicitly).
+     *   2. Calls Batch::recomputeExchangeRate() which:
+     *         - recomputes the BATCH's effective exchange_rate as a weighted
+     *           average of all payments' rates (paid portion) plus the
+     *           remaining unpaid amount at the highest rate seen (unpaid
+     *           portion). See Batch::recomputeExchangeRate() for the full
+     *           formula and edge-case handling.
+     *         - keeps total_paid_amount_foreign in sync.
+     *   3. Advances batch status pending → partial on the first payment.
+     *      Automatically marks batch fully_paid when total_paid ≥
+     *      total_cost_foreign (since we now have that column).
+     *   4. Posts an "out" movement to treasury_transactions.
      */
     public function store(StoreSupplierPaymentRequest $request): JsonResponse
     {
         $payment = DB::transaction(function () use ($request) {
             $amountForeign = (float) $request->validated('amount_foreign');
-            $exchangeRate = (float) $request->validated('exchange_rate');
-            $amountLocal = $request->filled('amount_local')
+            $exchangeRate  = (float) $request->validated('exchange_rate');
+            $amountLocal   = $request->filled('amount_local')
                 ? (float) $request->validated('amount_local')
                 : round($amountForeign * $exchangeRate, 2);
 
             /** @var SupplierPayment $payment */
             $payment = SupplierPayment::create([
-                'batch_id' => $request->validated('batch_id'),
-                'supplier_id' => $request->validated('supplier_id'),
+                'batch_id'      => $request->validated('batch_id'),
+                'supplier_id'   => $request->validated('supplier_id'),
                 'amount_foreign' => $amountForeign,
                 'exchange_rate' => $exchangeRate,
-                'amount_local' => $amountLocal,
-                'attachment' => $request->validated('attachment'),
-                'payment_date' => $request->validated('payment_date'),
-                'notes' => $request->validated('notes'),
-                'created_by' => $request->user()->id,
+                'amount_local'  => $amountLocal,
+                'attachment'    => $request->validated('attachment'),
+                'payment_date'  => $request->validated('payment_date'),
+                'notes'         => $request->validated('notes'),
+                'created_by'    => $request->user()->id,
             ]);
 
-            $this->recalculateBatchTotals($payment->batch_id);
-
+            $this->syncBatch($payment->batch_id);
             $this->postTreasuryMovement($payment, $request->user()->id);
 
             return $payment;
@@ -82,7 +83,7 @@ class SupplierPaymentController extends Controller
 
         return response()->json([
             'message' => 'تم تسجيل دفعة المورد بنجاح',
-            'data' => new SupplierPaymentResource($payment->load(['supplier', 'batch', 'creator'])),
+            'data'    => new SupplierPaymentResource($payment->load(['supplier', 'batch', 'creator'])),
         ], 201);
     }
 
@@ -98,19 +99,15 @@ class SupplierPaymentController extends Controller
     }
 
     /**
-     * Update an existing payment.
+     * Update an existing payment's amount or exchange_rate.
      *
-     * NOTE: editing amount_foreign/exchange_rate after the fact re-derives
-     * amount_local (unless explicitly overridden) and re-syncs the parent
-     * batch's running total — this keeps the batch total trustworthy even
-     * after corrections, instead of drifting from manual edits.
+     * Re-derives amount_local from (amount_foreign × exchange_rate) unless
+     * explicitly overridden, then recomputes the parent batch's effective
+     * exchange_rate from scratch via Batch::recomputeExchangeRate().
      *
-     * This intentionally does NOT touch the treasury ledger automatically:
-     * the original treasury_transactions row already represents what
-     * actually happened in the company's cash flow at that point in time.
-     * Silently mutating historical ledger entries would corrupt the audit
-     * trail. If a payment amount was genuinely wrong, void/delete it and
-     * record a new, correct payment instead.
+     * Does NOT touch treasury — the original entry represents the real
+     * cash flow at that point in time. Wrong amounts should be voided and
+     * re-entered rather than silently corrected in place.
      */
     public function update(UpdateSupplierPaymentRequest $request, SupplierPayment $supplierPayment): JsonResponse
     {
@@ -129,46 +126,33 @@ class SupplierPaymentController extends Controller
 
             $oldBatchId = $supplierPayment->batch_id;
 
-            // NOTE: array_filter(...!== null) means sending an explicit
-            // `"notes": null` will NOT clear notes — only omitting the key
-            // entirely leaves it untouched, same as omitting it. This is a
-            // deliberate trade-off for this endpoint: the financially
-            // load-bearing fields (amount_foreign/exchange_rate/amount_local)
-            // are computed separately above and always included, so this
-            // filter only affects descriptive fields (notes/attachment).
-            // If you need a real "clear this field" semantic for notes,
-            // switch to $request->has('notes') checks per-field instead.
             $supplierPayment->update(array_filter([
-                'batch_id' => $request->validated('batch_id'),
-                'supplier_id' => $request->validated('supplier_id'),
+                'batch_id'      => $request->validated('batch_id'),
+                'supplier_id'   => $request->validated('supplier_id'),
                 'amount_foreign' => $amountForeign,
                 'exchange_rate' => $exchangeRate,
-                'amount_local' => $amountLocal,
-                'attachment' => $request->validated('attachment'),
-                'payment_date' => $request->validated('payment_date'),
-                'notes' => $request->validated('notes'),
-            ], fn ($value) => $value !== null) + ['amount_local' => $amountLocal]);
+                'amount_local'  => $amountLocal,
+                'attachment'    => $request->validated('attachment'),
+                'payment_date'  => $request->validated('payment_date'),
+                'notes'         => $request->validated('notes'),
+            ], fn ($v) => $v !== null) + ['amount_local' => $amountLocal]);
 
-            // Re-sync totals for the (possibly two different) batches involved.
-            $this->recalculateBatchTotals($oldBatchId);
+            $this->syncBatch($oldBatchId);
+
             if ($supplierPayment->batch_id !== $oldBatchId) {
-                $this->recalculateBatchTotals($supplierPayment->batch_id);
+                $this->syncBatch($supplierPayment->batch_id);
             }
         });
 
         return response()->json([
             'message' => 'تم تحديث دفعة المورد بنجاح',
-            'data' => new SupplierPaymentResource($supplierPayment->load(['supplier', 'batch', 'creator'])),
+            'data'    => new SupplierPaymentResource($supplierPayment->load(['supplier', 'batch', 'creator'])),
         ]);
     }
 
     /**
-     * Soft-delete a payment and re-sync its batch's running total.
-     *
-     * Like update(), this does NOT retroactively remove the original
-     * treasury ledger entry — instead it posts a new, clearly-labelled
-     * reversal entry. The ledger should read like a bank statement: every
-     * real movement of cash stays visible, including corrections.
+     * Soft-delete a payment, post a treasury reversal entry, and recompute
+     * the parent batch's exchange_rate from the remaining payments.
      */
     public function destroy(SupplierPayment $supplierPayment): JsonResponse
     {
@@ -178,10 +162,8 @@ class SupplierPaymentController extends Controller
             $batchId = $supplierPayment->batch_id;
 
             $this->postTreasuryReversal($supplierPayment);
-
             $supplierPayment->delete();
-
-            $this->recalculateBatchTotals($batchId);
+            $this->syncBatch($batchId);
         });
 
         return response()->json([
@@ -189,13 +171,26 @@ class SupplierPaymentController extends Controller
         ]);
     }
 
+    // ------------------------------------------------------------------
+    // Internal helpers
+    // ------------------------------------------------------------------
+
     /**
-     * Recompute a batch's total_paid_amount_foreign from the live sum of
-     * its (non-deleted) payments, and advance pending -> partial on the
-     * first payment. Never auto-advances to fully_paid/cost_allocated —
-     * see the class-level note on update().
+     * Recompute exchange_rate (and total_paid_amount_foreign) on the batch
+     * via Batch::recomputeExchangeRate(), then update status:
+     *
+     *   - pending  → partial       on first payment.
+     *   - partial  → fully_paid    when total_paid ≥ total_cost_foreign
+     *                              (auto-detect now possible since we have
+     *                              total_cost_foreign on the batch).
+     *   - partial  → pending       if all payments are removed.
+     *   - fully_paid → partial     if a payment is removed and total drops
+     *                              back below total_cost_foreign.
+     *
+     * Status only advances to fully_paid automatically; transitioning to
+     * cost_allocated remains a deliberate manual action by staff.
      */
-    protected function recalculateBatchTotals(int $batchId): void
+    protected function syncBatch(int $batchId): void
     {
         $batch = Batch::find($batchId);
 
@@ -203,64 +198,72 @@ class SupplierPaymentController extends Controller
             return;
         }
 
-        $totalForeign = (float) $batch->payments()->sum('amount_foreign');
+        // recomputeExchangeRate() also refreshes total_paid_amount_foreign
+        // in the same single DB aggregate query — pass save: false so we
+        // can append the status change before the one save() call.
+        $batch->recomputeExchangeRate(save: false);
 
-        $batch->total_paid_amount_foreign = $totalForeign;
+        $totalPaid = (float) $batch->total_paid_amount_foreign;
+        $totalCost = (float) $batch->total_cost_foreign;
 
-        if ($totalForeign > 0 && $batch->status === Batch::STATUS_PENDING) {
-            $batch->status = Batch::STATUS_PARTIAL;
-        }
-
-        if ($totalForeign <= 0 && $batch->status === Batch::STATUS_PARTIAL) {
-            // All payments for this batch were removed; revert to pending.
-            $batch->status = Batch::STATUS_PENDING;
+        if ($totalPaid <= 0) {
+            if ($batch->status === Batch::STATUS_PARTIAL) {
+                $batch->status = Batch::STATUS_PENDING;
+            }
+        } elseif ($totalCost > 0 && $totalPaid >= $totalCost) {
+            if ($batch->status !== Batch::STATUS_COST_ALLOCATED) {
+                // Only auto-advance to fully_paid; cost_allocated is set
+                // manually when the cost has been distributed per-car.
+                $batch->status = Batch::STATUS_FULLY_PAID;
+            }
+        } else {
+            // Partial payment
+            if (in_array($batch->status, [Batch::STATUS_PENDING, Batch::STATUS_FULLY_PAID], true)) {
+                $batch->status = Batch::STATUS_PARTIAL;
+            }
         }
 
         $batch->save();
     }
 
     /**
-     * Post an "out" movement to the company treasury ledger for a new
-     * supplier payment, chaining off the most recent treasury balance.
+     * Post an "out" treasury movement for a new supplier payment.
      */
     protected function postTreasuryMovement(SupplierPayment $payment, int $userId): void
     {
-        $previousBalance = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
-        $newBalance = $previousBalance - (float) $payment->amount_local;
+        $prev = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
 
         TreasuryTransaction::create([
-            'direction' => TreasuryTransaction::DIRECTION_OUT,
-            'amount' => $payment->amount_local,
-            'previous_balence' => $previousBalance,
-            'current_balence' => $newBalance,
-            'source_type' => TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT,
-            'source_id' => $payment->id,
+            'direction'        => TreasuryTransaction::DIRECTION_OUT,
+            'amount'           => $payment->amount_local,
+            'previous_balence' => $prev,
+            'current_balence'  => $prev - (float) $payment->amount_local,
+            'source_type'      => TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT,
+            'source_id'        => $payment->id,
             'transaction_date' => $payment->payment_date,
-            'notes' => 'دفعة لمورد: '.($payment->supplier?->name ?? $payment->supplier_id),
-            'created_by' => $userId,
+            'notes'            => 'دفعة لمورد: '.($payment->supplier?->name ?? $payment->supplier_id),
+            'created_by'       => $userId,
         ]);
     }
 
     /**
-     * Post a reversing "in" movement when a supplier payment is deleted,
-     * so the treasury ledger keeps balancing without ever mutating the
-     * original entry.
+     * Post a reversing "in" treasury movement when a supplier payment is
+     * deleted (append-only ledger — never mutate historical entries).
      */
     protected function postTreasuryReversal(SupplierPayment $payment): void
     {
-        $previousBalance = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
-        $newBalance = $previousBalance + (float) $payment->amount_local;
+        $prev = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
 
         TreasuryTransaction::create([
-            'direction' => TreasuryTransaction::DIRECTION_IN,
-            'amount' => $payment->amount_local,
-            'previous_balence' => $previousBalance,
-            'current_balence' => $newBalance,
-            'source_type' => TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT,
-            'source_id' => $payment->id,
+            'direction'        => TreasuryTransaction::DIRECTION_IN,
+            'amount'           => $payment->amount_local,
+            'previous_balence' => $prev,
+            'current_balence'  => $prev + (float) $payment->amount_local,
+            'source_type'      => TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT,
+            'source_id'        => $payment->id,
             'transaction_date' => now()->toDateString(),
-            'notes' => 'إلغاء دفعة مورد محذوفة رقم #'.$payment->id,
-            'created_by' => $payment->created_by,
+            'notes'            => 'إلغاء دفعة مورد محذوفة رقم #'.$payment->id,
+            'created_by'       => $payment->created_by,
         ]);
     }
 }
