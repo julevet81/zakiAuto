@@ -117,8 +117,8 @@ class AgentController extends Controller
 
         $transactions = $agent->transactions()
             ->with(['customerPayment', 'treasuryTransaction'])
-            ->when($request->filled('date_from'), fn($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
             ->orderBy('transaction_date')
             ->orderBy('id')
             ->paginate($request->integer('per_page', 30));

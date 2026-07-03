@@ -33,15 +33,27 @@ class CustomerResource extends JsonResource
                 fn() => $this->orders_count ?? $this->orders->count()
             ),
 
-            // Financial summary - only computed for staff who can see
-            // payment data, and only when explicitly requested.
+            // Financial summary:
+            // • When loaded from AgentController::customers(), the values
+            //   are pre-computed via withSum() on the query (zero extra
+            //   queries) and arrive as total_paid_sum / total_remaining_sum.
+            // • When explicitly requested with ?with_stats=1 by staff who
+            //   hold the matching permissions, they are computed on the fly
+            //   via the model accessors.
+            // • Otherwise the fields are omitted entirely.
             'total_paid' => $this->when(
-                $request->boolean('with_stats') && $request->user()?->can('customer_payments.view'),
-                fn() => (float) $this->total_paid
+                isset($this->total_paid_sum)
+                    || ($request->boolean('with_stats') && $request->user()?->can('customer_payments.view')),
+                fn() => isset($this->total_paid_sum)
+                    ? (float) $this->total_paid_sum
+                    : (float) $this->total_paid
             ),
             'total_remaining' => $this->when(
-                $request->boolean('with_stats') && $request->user()?->can('orders.view'),
-                fn() => (float) $this->total_remaining
+                isset($this->total_remaining_sum)
+                    || ($request->boolean('with_stats') && $request->user()?->can('orders.view')),
+                fn() => isset($this->total_remaining_sum)
+                    ? (float) $this->total_remaining_sum
+                    : (float) $this->total_remaining
             ),
 
             // Uses OrderWithCarResource (not OrderMiniResource) so that
