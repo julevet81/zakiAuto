@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Batch\StoreBatchRequest;
 use App\Http\Requests\Batch\UpdateBatchRequest;
+use App\Http\Requests\Batch\ImportBatchCarsRequest;
 use App\Http\Resources\BatchResource;
 use App\Models\Batch;
+use App\Services\BatchCarsImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -88,5 +90,24 @@ class BatchController extends Controller
         $batch->delete();
 
         return response()->json(['message' => 'تم حذف الدفعة بنجاح']);
+    }
+
+    public function import(ImportBatchCarsRequest $request, BatchCarsImportService $importService): JsonResponse
+    {
+        $result = $importService->import(
+            $request->validated(),
+            $request->file('file'),
+            $request->user()->id
+        );
+
+        return response()->json([
+            'message' => 'تم استيراد دفعة الاستيراد والسيارات بنجاح',
+            'data' => [
+                'batch' => new BatchResource($result['batch']),
+                'created' => $result['created'],
+                'skipped' => $result['skipped'],
+                'errors' => $result['errors'],
+            ],
+        ], 201);
     }
 }

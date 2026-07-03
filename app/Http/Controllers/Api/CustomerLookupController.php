@@ -45,8 +45,14 @@ class CustomerLookupController extends Controller
      * logic itself needs no changes.
      * ─────────────────────────────────────────────────────────────────────
      */
-    public function show(string $passportNo): JsonResponse
+    public function show(?string $passportNo = null): JsonResponse
     {
+        if ($passportNo === null || trim($passportNo) === '') {
+            return response()->json([
+                'message' => 'يرجى تقديم رقم جواز السفر للبحث',
+            ], 422);
+        }
+
         // Normalise: trim whitespace and uppercase so "AB123456" and
         // " ab123456 " both find the same record.
         $passportNo = strtoupper(trim($passportNo));

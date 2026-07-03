@@ -65,7 +65,7 @@ Route::middleware('auth:sanctum')->get('/ping', function (\Illuminate\Http\Reque
 // Throttled at 10 req/min per IP to slow down enumeration attacks.
 // ------------------------------------------------------------------
 Route::middleware('throttle:lookup')
-    ->get('lookup/customer/{passportNo}', [CustomerLookupController::class, 'show']);
+    ->get('lookup/customer/{passportNo?}', [CustomerLookupController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -77,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('supplier-payments', SupplierPaymentController::class)
         ->parameters(['supplier-payments' => 'supplier_payment']);
 
+    Route::post('batches/import', [BatchController::class, 'import']);
     Route::apiResource('batches', BatchController::class);
 
     // ------------------------------------------------------------------

@@ -24,7 +24,6 @@ class ImportBatchCarsRequest extends FormRequest
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'container_opener_id' => ['nullable', 'integer', 'exists:container_openers,id'],
             'batch_number' => ['required', 'string', 'max:30', Rule::unique('batches', 'batch_number')],
-            'purchase_date' => ['nullable', 'date'],
             'total_cost_foreign' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
 

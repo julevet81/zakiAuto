@@ -708,6 +708,95 @@ paths:
         '422':
           description: لا يمكن الحذف إن كانت الدفعة مُحوَّلة بالفعل
 
+  /batches/import:
+    post:
+      tags: [Batches]
+      summary: استيراد دفعة استيراد وسيارات من ملف إكسل
+      description: ينشئ دفعة جديدة ويستورد كل السيارات المرتبطة بها والعملاء والطلبات من ملف إكسل المرفوع.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [supplier_id, batch_number, file]
+              properties:
+                supplier_id:
+                  type: integer
+                  description: معرف المورد
+                  example: 1
+                container_opener_id:
+                  type: integer
+                  description: معرف جهة فتح الحاوية
+                  nullable: true
+                  example: 1
+                batch_number:
+                  type: string
+                  description: رقم الدفعة الفريد
+                  example: "BATCH-2026-001"
+                purchase_date:
+                  type: string
+                  format: date
+                  description: تاريخ الشراء
+                  example: "2026-07-03"
+                total_cost_foreign:
+                  type: number
+                  description: التكلفة الإجمالية بالعملة الأجنبية
+                  example: 15000.00
+                notes:
+                  type: string
+                  description: ملاحظات إضافية
+                  example: "ملاحظات حول الدفعة المستوردة"
+                file:
+                  type: string
+                  format: binary
+                  description: ملف إكسل (xlsx, xls, csv) يحتوي على قائمة السيارات
+      responses:
+        '201':
+          description: تم استيراد دفعة الاستيراد والسيارات بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "تم استيراد دفعة الاستيراد والسيارات بنجاح"
+                  data:
+                    type: object
+                    properties:
+                      batch:
+                        type: object
+                        description: تفاصيل الدفعة التي تم إنشاؤها
+                      created:
+                        type: integer
+                        description: عدد السيارات التي تم إنشاؤها بنجاح
+                        example: 5
+                      skipped:
+                        type: integer
+                        description: عدد الأسطر التي تم تخطيها بسبب أخطاء
+                        example: 1
+                      errors:
+                        type: array
+                        description: قائمة الأخطاء بالتفصيل مع رقم السطر
+                        items:
+                          type: object
+                          properties:
+                            row:
+                              type: integer
+                              example: 3
+                            errors:
+                              type: array
+                              items:
+                                type: string
+                              example: ["رقم الهيكل (VIN) مكرر"]
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /batches:
     get:
       tags: [Batches]
