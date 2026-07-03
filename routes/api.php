@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CarController;
 use App\Http\Controllers\Api\CarsTableController;
 use App\Http\Controllers\Api\ContainerOpenerController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CustomerLookupController;
 use App\Http\Controllers\Api\CustomerPaymentController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentController;
@@ -58,6 +59,14 @@ Route::middleware('auth:sanctum')->get('/ping', function (\Illuminate\Http\Reque
     ]);
 });
 
+// ------------------------------------------------------------------
+// Public lookup — NO auth token required.
+// A customer can check their order status using their passport number.
+// Throttled at 10 req/min per IP to slow down enumeration attacks.
+// ------------------------------------------------------------------
+Route::middleware('throttle:lookup')
+    ->get('lookup/customer/{passportNo}', [CustomerLookupController::class, 'show']);
+
 Route::middleware('auth:sanctum')->group(function () {
 
     // ------------------------------------------------------------------
@@ -97,6 +106,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // ثالثًا: العملاء
     // ------------------------------------------------------------------
     Route::apiResource('customers', CustomerController::class);
+
+    // Customer profile documents (multiple file uploads)
+    Route::get('customers/{customer}/documents', [CustomerController::class, 'documents']);
+    Route::post('customers/{customer}/documents', [CustomerController::class, 'uploadDocuments']);
+    Route::delete('customers/{customer}/documents/{document}', [CustomerController::class, 'deleteDocument']);
 
     // ------------------------------------------------------------------
     // رابعًا: الوكلاء

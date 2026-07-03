@@ -86,6 +86,9 @@ class AgentController extends Controller
      * List the customers assigned to this agent (explicit requirement:
      * "عرض العملاء التابعين لكل وكيل"), as its own endpoint so the UI can
      * paginate/filter it independently of the agent's main payload.
+     *
+     * Returns total_paid and total_remaining per customer via withSum()
+     * (single aggregate query per column, no N+1).
      */
     public function customers(Request $request, Agent $agent): JsonResponse
     {
@@ -93,10 +96,14 @@ class AgentController extends Controller
 
         $customers = $agent->customers()
             ->withCount('orders')
+            ->withSum('payments as total_paid_sum', 'amount')
+            ->withSum('orders as total_remaining_sum', 'remaining_amount')
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 15));
 
-        return response()->json(CustomerResource::collection($customers)->response()->getData(true));
+        return response()->json(
+            CustomerResource::collection($customers)->response()->getData(true)
+        );
     }
 
     /**
@@ -110,8 +117,8 @@ class AgentController extends Controller
 
         $transactions = $agent->transactions()
             ->with(['customerPayment', 'treasuryTransaction'])
-            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
+            ->when($request->filled('date_from'), fn($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
             ->orderBy('transaction_date')
             ->orderBy('id')
             ->paginate($request->integer('per_page', 30));

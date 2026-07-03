@@ -31,5 +31,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('auth', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        // Public passport lookup — unauthenticated endpoint. Strict rate
+        // limit per IP to slow down enumeration/scraping attempts.
+        // 10 requests per minute means a manual lookup is comfortable
+        // but automated scanning of passport numbers is impractical.
+        RateLimiter::for('lookup', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
     }
 }

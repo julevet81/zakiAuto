@@ -30,18 +30,18 @@ class CustomerResource extends JsonResource
 
             'orders_count' => $this->when(
                 isset($this->orders_count) || $this->relationLoaded('orders'),
-                fn () => $this->orders_count ?? $this->orders->count()
+                fn() => $this->orders_count ?? $this->orders->count()
             ),
 
             // Financial summary - only computed for staff who can see
             // payment data, and only when explicitly requested.
             'total_paid' => $this->when(
                 $request->boolean('with_stats') && $request->user()?->can('customer_payments.view'),
-                fn () => (float) $this->total_paid
+                fn() => (float) $this->total_paid
             ),
             'total_remaining' => $this->when(
                 $request->boolean('with_stats') && $request->user()?->can('orders.view'),
-                fn () => (float) $this->total_remaining
+                fn() => (float) $this->total_remaining
             ),
 
             // Uses OrderWithCarResource (not OrderMiniResource) so that
@@ -52,6 +52,17 @@ class CustomerResource extends JsonResource
             // recursion must be avoided.
             'orders'   => OrderWithCarResource::collection($this->whenLoaded('orders')),
             'payments' => CustomerPaymentResource::collection($this->whenLoaded('payments')),
+
+            // Profile documents (passport copy, national ID scan, etc.)
+            'documents' => CustomerDocumentResource::collection($this->whenLoaded('customerDocuments')),
+
+            // Linked user account summary (never expose password/tokens)
+            'account' => $this->whenLoaded('user', fn() => $this->user ? [
+                'id'         => $this->user->id,
+                'email'      => $this->user->email,
+                'is_active'  => $this->user->is_active,
+                'last_login' => null, // extend later if you add last_login_at column
+            ] : null),
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

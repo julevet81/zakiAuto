@@ -58,6 +58,15 @@ class Customer extends Model
     }
 
     /**
+     * Profile documents uploaded for this customer (passport copy,
+     * national ID scan, signed contract, power of attorney, etc.)
+     */
+    public function customerDocuments(): HasMany
+    {
+        return $this->hasMany(CustomerDocument::class);
+    }
+
+    /**
      * Total amount this customer has paid so far, across all orders.
      */
     public function getTotalPaidAttribute(): float
