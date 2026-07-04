@@ -12,68 +12,39 @@ class CustomerLookupController extends Controller
     /**
      * Public (unauthenticated) customer lookup by passport number.
      *
-     * ⚠️  SECURITY NOTES ─────────────────────────────────────────────────
+     * URL: GET /api/lookup/customer/{passport_no}
      *
-     * This endpoint intentionally requires NO authentication token. That
-     * is a deliberate product decision: a customer who doesn't have (or
-     * hasn't set up) a system account should still be able to check the
-     * status of their own order by presenting their passport number, in
-     * the same way a parcel-tracking page works with a tracking code.
+     * Throttled at 10 requests/minute/IP via the 'lookup' named limiter
+     * defined in AppServiceProvider::boot().
      *
-     * The trade-offs accepted by choosing no-auth here are:
-     *
-     *   1. ENUMERATION RISK — an attacker who can guess/brute-force valid
-     *      passport numbers could retrieve customer data. Mitigated by:
-     *        • The `throttle:lookup` rate limiter (10 req / minute / IP),
-     *          configured in AppServiceProvider.
-     *        • Returning an identical 404-shaped response for "not found"
-     *          and "found but wrong format" so response timing/shape
-     *          leaks no information about whether a record exists.
-     *
-     *   2. DATA SCOPE — the response deliberately omits every internal
-     *      field (supplier, costs, agent identity, internal IDs) that has
-     *      no value to the customer themselves. See
-     *      CustomerPassportLookupResource for the exact field list.
-     *
-     *   3. SOFT-DELETED CUSTOMERS — Eloquent's global SoftDeletes scope
-     *      ensures deleted customers are never returned, even if someone
-     *      holds a passport number that was previously in the system.
-     *
-     * If you later decide this endpoint should require a token (e.g. a
-     * short-lived OTP sent to the customer's phone), move it under the
-     * `auth:sanctum` middleware group in routes/api.php — the controller
-     * logic itself needs no changes.
-     * ─────────────────────────────────────────────────────────────────────
+     * Returns 404 for both "not found" and "invalid format" so that
+     * timing/shape attacks cannot distinguish whether a passport number
+     * exists in the system.
      */
-    public function show(?string $passportNo = null): JsonResponse
+    public function show(string $passport_no): JsonResponse
     {
-        if ($passportNo === null || trim($passportNo) === '') {
-            return response()->json([
-                'message' => 'يرجى تقديم رقم جواز السفر للبحث',
-            ], 422);
-        }
+        // Normalise: trim whitespace + uppercase so "ab123456",
+        // "AB123456", and " Ab123456 " all match the same record.
+        $passportNo = strtoupper(trim($passport_no));
 
-        // Normalise: trim whitespace and uppercase so "AB123456" and
-        // " ab123456 " both find the same record.
-        $passportNo = strtoupper(trim($passportNo));
+        if (empty($passportNo)) {
+            return response()->json([
+                'message' => 'لم يتم العثور على سجل بهذا الرقم',
+            ], 404);
+        }
 
         $customer = Customer::query()
             ->where('passport_no', $passportNo)
             ->with([
-                // Load orders with their car and their payments, all in
-                // two extra queries (not N+1) thanks to eager loading.
-                'orders' => fn($q) => $q->orderBy('id'),
+                'orders'          => fn ($q) => $q->orderBy('id'),
                 'orders.car',
-                'orders.payments' => fn($q) => $q
+                'orders.payments' => fn ($q) => $q
                     ->orderBy('payment_date')
                     ->orderBy('id'),
             ])
             ->first();
 
         if (! $customer) {
-            // Return exactly the same shape as a found-but-empty result
-            // so that timing/structure attacks cannot distinguish
-            // "passport exists" from "passport not found".
             return response()->json([
                 'message' => 'لم يتم العثور على سجل بهذا الرقم',
             ], 404);
