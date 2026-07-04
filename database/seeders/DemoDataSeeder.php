@@ -118,12 +118,12 @@ class DemoDataSeeder extends Seeder
     private function seedCustomers(array $agents): array
     {
         $rows = [
-            ['customer1@zaki.com', 'Yacine Amrani', '0662002001', 'ID-100001', 'P-100001', 0],
-            ['customer2@zaki.com', 'Meriem Saidi', '0662002002', 'ID-100002', 'P-100002', 1],
-            ['customer3@zaki.com', 'Walid Toumi', '0662002003', 'ID-100003', 'P-100003', 2],
-            ['customer4@zaki.com', 'Amina Cherif', '0662002004', 'ID-100004', 'P-100004', 0],
-            ['customer5@zaki.com', 'Omar Belkacem', '0662002005', 'ID-100005', 'P-100005', null],
-            ['customer6@zaki.com', 'Lina Kaced', '0662002006', 'ID-100006', 'P-100006', 1],
+            ['customer1@zaki.com', 'Yacine Amrani', '0662002001', 'ID-100001', 'AB123456', 0],
+            ['customer2@zaki.com', 'Meriem Saidi', '0662002002', 'ID-100002', 'AB123457', 1],
+            ['customer3@zaki.com', 'Walid Toumi', '0662002003', 'ID-100003', 'AB123458', 2],
+            ['customer4@zaki.com', 'Amina Cherif', '0662002004', 'ID-100004', 'AB123459', 0],
+            ['customer5@zaki.com', 'Omar Belkacem', '0662002005', 'ID-100005', 'AB123460', null],
+            ['customer6@zaki.com', 'Lina Kaced', '0662002006', 'ID-100006', 'AB123461', 1],
         ];
 
         return array_map(function (array $row) use ($agents) {
