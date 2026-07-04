@@ -64,8 +64,10 @@ Route::middleware('auth:sanctum')->get('/ping', function (\Illuminate\Http\Reque
 // A customer can check their order status using their passport number.
 // Throttled at 10 req/min per IP to slow down enumeration attacks.
 // ------------------------------------------------------------------
-Route::middleware('throttle:lookup')
-    ->get('lookup/customer/{passport_no}', [CustomerLookupController::class, 'show']);
+Route::middleware('throttle:lookup')->group(function () {
+    Route::get('lookup/customer/{passport_no}', [CustomerLookupController::class, 'show']);
+    Route::get('lookup/customer',               [CustomerLookupController::class, 'show']);
+});
 
 Route::middleware('auth:sanctum')->group(function () {
 

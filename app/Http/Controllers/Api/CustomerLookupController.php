@@ -6,39 +6,44 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CustomerPassportLookupResource;
 use App\Models\Customer;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CustomerLookupController extends Controller
 {
     /**
-     * Public (unauthenticated) customer lookup by passport number.
+     * Public customer lookup by passport number.
      *
-     * URL: GET /api/lookup/customer/{passport_no}
+     * Accepts the passport number in TWO ways so the client can choose:
      *
-     * Throttled at 10 requests/minute/IP via the 'lookup' named limiter
-     * defined in AppServiceProvider::boot().
+     *   1. URL parameter (RESTful):
+     *      GET /api/lookup/customer/AB123456
      *
-     * Returns 404 for both "not found" and "invalid format" so that
-     * timing/shape attacks cannot distinguish whether a passport number
-     * exists in the system.
+     *   2. Query string (easier to test in Postman/browser):
+     *      GET /api/lookup/customer?passport_no=AB123456
+     *
+     * Both routes point to this same method.
      */
-    public function show(string $passport_no): JsonResponse
+    public function show(Request $request, ?string $passport_no = null): JsonResponse
     {
-        // Normalise: trim whitespace + uppercase so "ab123456",
-        // "AB123456", and " Ab123456 " all match the same record.
-        $passportNo = strtoupper(trim($passport_no));
+        // Accept from URL segment OR query string, URL takes priority.
+        $raw = $passport_no ?? $request->query('passport_no', '');
 
-        if (empty($passportNo)) {
+        // Normalise: trim + uppercase.
+        $passportNo = strtoupper(trim((string) $raw));
+
+        if ($passportNo === '') {
             return response()->json([
-                'message' => 'لم يتم العثور على سجل بهذا الرقم',
-            ], 404);
+                'message' => 'يرجى إدخال رقم جواز السفر',
+                'hint'    => 'GET /api/lookup/customer/{passport_no}  أو  GET /api/lookup/customer?passport_no=AB123456',
+            ], 422);
         }
 
         $customer = Customer::query()
             ->where('passport_no', $passportNo)
             ->with([
-                'orders'          => fn ($q) => $q->orderBy('id'),
+                'orders'          => fn($q) => $q->orderBy('id'),
                 'orders.car',
-                'orders.payments' => fn ($q) => $q
+                'orders.payments' => fn($q) => $q
                     ->orderBy('payment_date')
                     ->orderBy('id'),
             ])
