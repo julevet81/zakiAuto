@@ -43,7 +43,7 @@ Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
     });
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
@@ -52,7 +52,7 @@ Route::prefix('auth')->group(function () {
 });
 
 // Sanity-check route to confirm auth + role/permission data is wired correctly.
-Route::middleware('auth:sanctum')->get('/ping', function (\Illuminate\Http\Request $request) {
+Route::middleware(['auth:sanctum', 'staff_only'])->get('/ping', function (\Illuminate\Http\Request $request) {
     return response()->json([
         'message' => 'pong',
         'user_id' => $request->user()->id,
@@ -70,7 +70,7 @@ Route::middleware('throttle:lookup')->group(function () {
     Route::get('lookup/customer',               [CustomerLookupController::class, 'show']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
 
     // ------------------------------------------------------------------
     // أولاً: الموردين

@@ -13,7 +13,7 @@ class CustomerCreateTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_can_be_created_with_agent_id(): void
+    public function test_customer_can_be_created_with_agent_id_without_user_account(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -38,8 +38,9 @@ class CustomerCreateTest extends TestCase
             'email' => 'omar@zaki.com',
             'national_id' => '2514789632541785',
             'agent_id' => 2,
+            'user_id' => null,
         ]);
-        $this->assertDatabaseHas('users', [
+        $this->assertDatabaseMissing('users', [
             'email' => 'omar@zaki.com',
             'phone' => '0547896541',
         ]);

@@ -78,7 +78,7 @@ class UserController extends Controller
         $this->authorize('view', $user);
 
         return response()->json([
-            'data' => new UserResource($user->load(['roles', 'agent', 'customer'])),
+            'data' => new UserResource($user->load(['roles', 'agent'])),
         ]);
     }
 

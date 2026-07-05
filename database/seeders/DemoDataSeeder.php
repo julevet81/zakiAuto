@@ -128,13 +128,12 @@ class DemoDataSeeder extends Seeder
 
         return array_map(function (array $row) use ($agents) {
             [$email, $name, $phone, $nationalId, $passportNo, $agentIndex] = $row;
-            $user = $this->user($email, $name, $phone, 'customer');
             $agent = $agentIndex === null ? null : $agents[$agentIndex];
 
             return Customer::query()->updateOrCreate(
                 ['email' => $email],
                 [
-                    'user_id' => $user->id,
+                    'user_id' => null,
                     'agent_id' => $agent?->id,
                     'name' => $name,
                     'phone' => $phone,

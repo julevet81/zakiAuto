@@ -19,7 +19,7 @@ class ChangeUserRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', Rule::in(['super-admin', 'admin', 'agent', 'customer'])],
+            'role' => ['required', Rule::in(['super-admin', 'admin', 'agent'])],
         ];
     }
 

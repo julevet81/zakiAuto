@@ -24,14 +24,12 @@ class UpdateCustomerRequest extends FormRequest
             'national_id' => ['nullable', 'string', 'max:50'],
             'passport_no' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
-
-            // Re-assigning a customer to a different agent, or linking a
-            // user account, stays an admin-only action — same reasoning
-            // as StoreCustomerRequest.
             'agent_id' => [
-                'nullable', 'integer', 'exists:agents,id',
-                Rule::prohibitIf(! $this->user()->can('customers.view')),
-            ]
+                'nullable',
+                'integer',
+                'exists:agents,id',
+                Rule::prohibitedIf(! $this->user()->can('customers.view')),
+            ],
         ];
     }
 
@@ -42,7 +40,6 @@ class UpdateCustomerRequest extends FormRequest
     {
         return [
             'agent_id.prohibited' => 'لا تملك صلاحية تحديد الوكيل مباشرة',
-            'user_id.prohibited' => 'لا تملك صلاحية ربط حساب مستخدم مباشرة',
         ];
     }
 }

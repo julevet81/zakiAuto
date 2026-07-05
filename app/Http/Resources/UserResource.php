@@ -30,7 +30,6 @@ class UserResource extends JsonResource
                 fn () => $this->getAllPermissions()->pluck('name')
             ),
             'agent_id' => $this->whenLoaded('agent', fn () => $this->agent?->id),
-            'customer_id' => $this->whenLoaded('customer', fn () => $this->customer?->id),
             'created_at' => $this->created_at,
         ];
     }

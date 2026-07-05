@@ -6,12 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\UpdatePasswordRequest;
+use App\Http\Resources\CustomerResource;
 use App\Http\Resources\UserResource;
 use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -19,54 +19,34 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Register a new public account.
+     * Register a public customer profile only.
      *
-     * Public self-registration always creates a "customer" account, plus a
-     * linked `customers` row so the new user immediately shows up in the
-     * Customers module and can have orders/payments attached to them.
-     *
-     * Staff accounts (super-admin, admin, agent) are never created through
-     * this endpoint — they must be created by an authorized admin through
-     * the Users management endpoints, where a role is explicitly assigned.
+     * Customers are not system users and never receive login credentials or
+     * Sanctum tokens. They can only use public unauthenticated endpoints.
      */
     public function register(RegisterRequest $request): JsonResponse
     {
-        $user = DB::transaction(function () use ($request) {
-            $user = User::create([
+        $customer = DB::transaction(function () use ($request) {
+            return Customer::create([
+                'user_id' => null,
+                'agent_id' => null,
                 'name' => $request->validated('name'),
                 'email' => $request->validated('email'),
                 'phone' => $request->validated('phone'),
-                'password' => Hash::make($request->validated('password')),
-                'is_active' => true,
+                'national_id' => $request->validated('national_id'),
+                'passport_no' => $request->validated('passport_no'),
+                'address' => $request->validated('address'),
             ]);
-
-            $user->assignRole('customer');
-
-            Customer::create([
-                'user_id' => $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'email' => $user->email,
-            ]);
-
-            return $user;
         });
 
-        $token = $user->createToken($request->input('device_name', 'api-token'))->plainTextToken;
-
         return response()->json([
-            'message' => 'تم إنشاء الحساب بنجاح',
-            'user' => new UserResource($user->load('roles')),
-            'token' => $token,
+            'message' => 'تم إنشاء ملف العميل بنجاح',
+            'data' => new CustomerResource($customer),
         ], 201);
     }
 
     /**
-     * Authenticate and issue a new Sanctum personal access token.
-     *
-     * Note: this intentionally does NOT revoke the user's other tokens, so
-     * a user can be logged in from multiple devices simultaneously. Use
-     * logoutAll() to revoke every token at once.
+     * Authenticate staff users and issue a Sanctum personal access token.
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -84,6 +64,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->hasRole('customer')) {
+            throw ValidationException::withMessages([
+                'email' => ['العملاء لا يملكون صلاحية الدخول إلى النظام. يرجى استخدام رابط تتبع الطلب العام.'],
+            ]);
+        }
+
         $token = $user->createToken($request->input('device_name', 'api-token'))->plainTextToken;
 
         return response()->json([
@@ -94,7 +80,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Return the currently authenticated user, with roles & permissions.
+     * Return the currently authenticated user, with roles and permissions.
      */
     public function me(Request $request): JsonResponse
     {
@@ -128,7 +114,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Revoke only the token used to make this request (log out this device).
+     * Revoke only the token used to make this request.
      */
     public function logout(Request $request): JsonResponse
     {
@@ -140,7 +126,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Revoke every token belonging to the user (log out of all devices).
+     * Revoke every token belonging to the user.
      */
     public function logoutAll(Request $request): JsonResponse
     {

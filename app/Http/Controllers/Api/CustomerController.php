@@ -104,14 +104,6 @@ class CustomerController extends Controller
     {
         $customer->update($request->validated());
 
-        // Keep the linked User's name/phone in sync with the customer profile.
-        if ($customer->user) {
-            $customer->user->update(array_filter([
-                'name'  => $request->validated('name'),
-                'phone' => $request->validated('phone'),
-            ]));
-        }
-
         return response()->json([
             'message' => 'تم تحديث بيانات العميل بنجاح',
             'data'    => new CustomerResource($customer->load('agent')),
