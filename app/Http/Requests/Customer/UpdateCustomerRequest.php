@@ -31,12 +31,7 @@ class UpdateCustomerRequest extends FormRequest
             'agent_id' => [
                 'nullable', 'integer', 'exists:agents,id',
                 Rule::prohibitIf(! $this->user()->can('customers.view')),
-            ],
-            'user_id' => [
-                'nullable', 'integer', 'exists:users,id',
-                Rule::unique('customers', 'user_id')->ignore($this->route('customer')),
-                Rule::prohibitIf(! $this->user()->can('customers.view')),
-            ],
+            ]
         ];
     }
 

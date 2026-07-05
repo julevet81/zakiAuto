@@ -33,7 +33,7 @@ class CarController extends Controller
             ->when($canSeeOperationalData, fn($q) => $q->with([
                 'supplier',
                 'containerOpener',
-                'batch:id,batch_number,exchange_rate,status', // exchange_rate مطلوب صريحاً
+                'batch:id,exchange_rate,status', // exchange_rate مطلوب صريحاً
             ]))
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))

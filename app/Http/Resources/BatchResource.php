@@ -22,7 +22,6 @@ class BatchResource extends JsonResource
             'id'           => $this->id,
             'supplier_id'  => $this->supplier_id,
             'supplier'     => new SupplierMiniResource($this->whenLoaded('supplier')),
-            'batch_number' => $this->batch_number,
             'purchase_date' => $this->purchase_date?->format('Y-m-d'),
 
             // User-entered: the total agreed purchase price from the

@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests\SupplierPayment;
 
-use App\Models\Batch;
 use App\Models\SupplierPayment;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 
 class StoreSupplierPaymentRequest extends FormRequest
 {
@@ -15,50 +13,37 @@ class StoreSupplierPaymentRequest extends FormRequest
     }
 
     /**
+     * The user no longer selects which batch to pay — the system
+     * distributes the amount automatically across the supplier's oldest
+     * unpaid batches (FIFO). See SupplierPaymentController::store().
+     *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
-            'batch_id' => ['required', 'integer', 'exists:batches,id'],
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'supplier_id'   => ['required', 'integer', 'exists:suppliers,id'],
             'amount_foreign' => ['required', 'numeric', 'min:0.01'],
             'exchange_rate' => ['required', 'numeric', 'min:0.0001'],
-            // amount_local is derived (amount_foreign * exchange_rate) when
-            // not provided, but can be passed explicitly to override
-            // rounding, e.g. when the accountant's paperwork uses a
-            // slightly different rounded figure.
-            'amount_local' => ['nullable', 'numeric', 'min:0'],
-            'attachment' => ['nullable', 'string', 'max:255'],
-            'payment_date' => ['required', 'date'],
-            'notes' => ['nullable', 'string'],
+            // amount_local may be overridden (e.g. accountant's rounded figure).
+            // If absent it is computed as amount_foreign × exchange_rate.
+            'amount_local'  => ['nullable', 'numeric', 'min:0'],
+            'attachment'    => ['nullable', 'string', 'max:255'],
+            'payment_date'  => ['required', 'date'],
+            'notes'         => ['nullable', 'string'],
         ];
     }
 
     /**
-     * Cross-field validation: the chosen batch must actually belong to the
-     * chosen supplier. Without this check it would be possible to record
-     * a payment for Supplier A against a batch that belongs to Supplier B,
-     * silently corrupting both suppliers' financial history.
+     * @return array<string, string>
      */
-    public function withValidator(Validator $validator): void
+    public function messages(): array
     {
-        $validator->after(function (Validator $validator) {
-            $batchId = $this->input('batch_id');
-            $supplierId = $this->input('supplier_id');
-
-            if (! $batchId || ! $supplierId) {
-                return;
-            }
-
-            $batch = Batch::find($batchId);
-
-            if ($batch && (int) $batch->supplier_id !== (int) $supplierId) {
-                $validator->errors()->add(
-                    'batch_id',
-                    'دفعة الاستيراد المحددة لا تعود لهذا المورد'
-                );
-            }
-        });
+        return [
+            'supplier_id.required'   => 'يجب تحديد المورد',
+            'amount_foreign.min'     => 'المبلغ يجب أن يكون أكبر من صفر',
+            'exchange_rate.required' => 'يجب إدخال سعر الصرف',
+            'payment_date.required'  => 'يجب تحديد تاريخ الدفع',
+        ];
     }
 }

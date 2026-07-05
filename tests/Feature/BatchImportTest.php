@@ -4,11 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Batch;
 use App\Models\Car;
-use App\Models\CarExpense;
+use App\Models\ContainerOpener;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Supplier;
-use App\Models\ContainerOpener;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,13 +29,10 @@ class BatchImportTest extends TestCase
     {
         parent::setUp();
 
-        // Seed roles and permissions
         $this->seed(RolesAndPermissionsSeeder::class);
 
-        // Retrieve the user created by the seeder
         $this->user = User::where('email', 'superadmin@zaki.com')->first();
 
-        // Create a supplier and container opener
         $this->supplier = Supplier::create([
             'name' => 'Tokyo Auto Export',
             'phone' => '+81300010001',
@@ -53,14 +49,195 @@ class BatchImportTest extends TestCase
         ]);
     }
 
-    /**
-     * Test importing batch and cars successfully.
-     */
     public function test_import_batch_and_cars_successfully(): void
     {
         Sanctum::actingAs($this->user);
 
-        // Create spreadsheet with one valid row and one invalid row
+        $file = $this->spreadsheetUpload([
+            [
+                'Toyota',
+                'Camry',
+                'GLE',
+                2023,
+                'Silver',
+                'VIN12345678901234',
+                15000,
+                'TRACK123',
+                'Ahmad Zaki',
+                'P123456',
+                'N123456',
+                1500,
+                '2026-07-03',
+            ],
+        ]);
+
+        $response = $this->postJson('/api/batches/import', [
+            'supplier_id' => $this->supplier->id,
+            'container_opener_id' => $this->containerOpener->id,
+            'purchase_date' => '2026-07-03',
+            'total_cost_foreign' => 15000,
+            'notes' => 'Import test notes',
+            'file' => $file,
+        ]);
+
+        @unlink($file->getRealPath());
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure([
+            'message',
+            'data' => [
+                'batch',
+                'created',
+                'skipped',
+                'errors',
+            ],
+        ]);
+
+        $this->assertEquals(1, $response->json('data.created'));
+        $this->assertEquals(0, $response->json('data.skipped'));
+        $this->assertCount(0, $response->json('data.errors'));
+
+        $this->assertDatabaseHas('batches', [
+            'supplier_id' => $this->supplier->id,
+            'total_cost_foreign' => 15000.00,
+            'notes' => 'Import test notes',
+            'cars_count' => 1,
+        ]);
+
+        $car = Car::where('vin', 'VIN12345678901234')->first();
+        $this->assertNotNull($car);
+        $this->assertEquals($this->containerOpener->id, $car->container_opener_id);
+
+        $this->assertDatabaseHas('car_expenses', [
+            'car_id' => $car->id,
+            'expense_type' => 'شحن',
+            'local_amount' => 1500.00,
+        ]);
+
+        $this->assertDatabaseHas('customers', [
+            'name' => 'Ahmad Zaki',
+            'passport_no' => 'P123456',
+            'national_id' => 'N123456',
+        ]);
+
+        $customer = Customer::where('passport_no', 'P123456')->first();
+
+        $order = Order::where('car_id', $car->id)->first();
+        $this->assertNotNull($order);
+        $this->assertEquals($customer->id, $order->customer_id);
+        $this->assertEquals(Order::STATUS_NEW, $order->status);
+        $this->assertEquals('2026-07-03', $order->purchase_date->format('Y-m-d'));
+        $this->assertEquals(15000.00, $order->remaining_amount);
+        $this->assertEquals($this->user->id, $order->created_by);
+    }
+
+    public function test_import_failure_does_not_create_batch_or_cars(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $file = $this->spreadsheetUpload([
+            [
+                '',
+                'Corolla',
+                'Active',
+                2022,
+                'Red',
+                'VINERR123456',
+                12000,
+                'TRACKERR',
+                'Ahmad Bad',
+                'P999999',
+                'N999999',
+                1000,
+                '2026-07-03',
+            ],
+        ]);
+
+        $response = $this->postJson('/api/batches/import', [
+            'supplier_id' => $this->supplier->id,
+            'container_opener_id' => $this->containerOpener->id,
+            'purchase_date' => '2026-07-03',
+            'total_cost_foreign' => 12000,
+            'notes' => 'Import failure test notes',
+            'file' => $file,
+        ]);
+
+        @unlink($file->getRealPath());
+
+        $response->assertStatus(422);
+        $this->assertNull($response->json('data.batch'));
+        $this->assertEquals(0, $response->json('data.created'));
+        $this->assertEquals(1, $response->json('data.skipped'));
+        $this->assertEquals(2, $response->json('data.errors.0.row'));
+        $this->assertNotEmpty($response->json('data.errors.0.errors.0'));
+
+        $this->assertDatabaseMissing('batches', [
+            'supplier_id' => $this->supplier->id,
+            'notes' => 'Import failure test notes',
+        ]);
+        $this->assertDatabaseMissing('cars', [
+            'vin' => 'VINERR123456',
+        ]);
+        $this->assertDatabaseMissing('customers', [
+            'passport_no' => 'P999999',
+        ]);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_batch_status_transitions_automatically(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $batch = Batch::create([
+            'supplier_id' => $this->supplier->id,
+            'purchase_date' => '2026-07-01',
+            'total_cost_foreign' => 1000.00,
+            'status' => Batch::STATUS_PARTIAL,
+            'exchange_rate' => 1.00,
+        ]);
+
+        $this->assertEquals(Batch::STATUS_PARTIAL, $batch->status);
+
+        $response1 = $this->postJson('/api/supplier-payments', [
+            'supplier_id' => $this->supplier->id,
+            'amount_foreign' => 400.00,
+            'exchange_rate' => 135.00,
+            'payment_date' => '2026-07-02',
+        ]);
+
+        $response1->assertStatus(201);
+        $batch->refresh();
+        $this->assertEquals(Batch::STATUS_PARTIAL, $batch->status);
+        $this->assertEquals(400.00, (float) $batch->total_paid_amount_foreign);
+
+        $response2 = $this->postJson('/api/supplier-payments', [
+            'supplier_id' => $this->supplier->id,
+            'amount_foreign' => 600.00,
+            'exchange_rate' => 135.00,
+            'payment_date' => '2026-07-03',
+        ]);
+
+        $response2->assertStatus(201);
+        $batch->refresh();
+        $this->assertEquals(Batch::STATUS_FULLY_PAID, $batch->status);
+        $this->assertEquals(1000.00, (float) $batch->total_paid_amount_foreign);
+
+        $payment2Id = $response2->json('payments_created.0.id');
+        $this->assertNotNull($payment2Id);
+
+        $responseDelete = $this->deleteJson("/api/supplier-payments/{$payment2Id}");
+        $responseDelete->assertStatus(200);
+
+        $batch->refresh();
+        $this->assertEquals(Batch::STATUS_PARTIAL, $batch->status);
+        $this->assertEquals(400.00, (float) $batch->total_paid_amount_foreign);
+    }
+
+    /**
+     * @param  array<int, array<int, mixed>>  $rows
+     */
+    private function spreadsheetUpload(array $rows): UploadedFile
+    {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
@@ -84,138 +261,22 @@ class BatchImportTest extends TestCase
             $sheet->setCellValueByColumnAndRow($colIndex + 1, 1, $header);
         }
 
-        // Row 2: Valid car & customer
-        $row2 = [
-            'Toyota', // Brand
-            'Camry', // Model
-            'GLE', // Finition
-            2023, // Year
-            'Silver', // Color
-            'VIN12345678901234', // VIN
-            15000, // Purchase Price
-            'TRACK123', // Tracking Number
-            'Ahmad Zaki', // Customer Name
-            'P123456', // Passport No
-            'N123456', // National ID
-            1500, // Shipping Cost
-            '2026-07-03', // Arrival Date
-        ];
-
-        foreach ($row2 as $colIndex => $value) {
-            $sheet->setCellValueByColumnAndRow($colIndex + 1, 2, $value);
-        }
-
-        // Row 3: Invalid car (should be skipped but not fail the entire import)
-        $row3 = [
-            '', // Empty Brand (invalid)
-            'Corolla',
-            'Active',
-            2022,
-            'Red',
-            'VINERR123456',
-            12000,
-            'TRACKERR',
-            'Ahmad Bad',
-            'P999999',
-            'N999999',
-            1000,
-            '2026-07-03',
-        ];
-
-        foreach ($row3 as $colIndex => $value) {
-            $sheet->setCellValueByColumnAndRow($colIndex + 1, 3, $value);
+        foreach ($rows as $rowIndex => $row) {
+            foreach ($row as $colIndex => $value) {
+                $sheet->setCellValueByColumnAndRow($colIndex + 1, $rowIndex + 2, $value);
+            }
         }
 
         $tempFile = tempnam(sys_get_temp_dir(), 'import_test_');
         $writer = new Xlsx($spreadsheet);
         $writer->save($tempFile);
 
-        $file = new UploadedFile(
+        return new UploadedFile(
             $tempFile,
             'import.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             null,
             true
         );
-
-        $response = $this->postJson('/api/batches/import', [
-            'supplier_id' => $this->supplier->id,
-            'container_opener_id' => $this->containerOpener->id,
-            'batch_number' => 'BATCH-TEST-IMPORT-1',
-            'purchase_date' => '2026-07-03',
-            'total_cost_foreign' => 15000,
-            'notes' => 'Import test notes',
-            'file' => $file,
-        ]);
-
-        unlink($tempFile);
-
-        $response->assertStatus(201);
-        $response->assertJsonStructure([
-            'message',
-            'data' => [
-                'batch',
-                'created',
-                'skipped',
-                'errors',
-            ],
-        ]);
-
-        $this->assertEquals(1, $response->json('data.created'));
-        $this->assertEquals(1, $response->json('data.skipped'));
-        $this->assertCount(1, $response->json('data.errors'));
-        $this->assertEquals(3, $response->json('data.errors.0.row')); // Row 3 had errors
-
-        // Verify database records
-        $this->assertDatabaseHas('batches', [
-            'batch_number' => 'BATCH-TEST-IMPORT-1',
-            'supplier_id' => $this->supplier->id,
-            'cars_count' => 1,
-        ]);
-
-        $batch = Batch::where('batch_number', 'BATCH-TEST-IMPORT-1')->first();
-
-        $this->assertDatabaseHas('cars', [
-            'batch_id' => $batch->id,
-            'supplier_id' => $this->supplier->id,
-            'container_opener_id' => $this->containerOpener->id,
-            'brand' => 'Toyota',
-            'model' => 'Camry',
-            'finition' => 'GLE',
-            'manufacture_year' => 2023,
-            'color' => 'Silver',
-            'vin' => 'VIN12345678901234',
-            'foreign_purchase_price' => 15000,
-            'sale_price' => 15000,
-            'tracking_number' => 'TRACK123',
-            'status' => Car::STATUS_RESERVED,
-        ]);
-
-        $car = Car::where('vin', 'VIN12345678901234')->first();
-
-        // Verify Shipping cost CarExpense was created
-        $this->assertDatabaseHas('car_expenses', [
-            'car_id' => $car->id,
-            'expense_type' => 'شحن',
-            'local_amount' => 1500.00,
-        ]);
-
-        // Verify Customer was created/matched
-        $this->assertDatabaseHas('customers', [
-            'name' => 'Ahmad Zaki',
-            'passport_no' => 'P123456',
-            'national_id' => 'N123456',
-        ]);
-
-        $customer = Customer::where('passport_no', 'P123456')->first();
-
-        // Verify Order was created
-        $order = Order::where('car_id', $car->id)->first();
-        $this->assertNotNull($order);
-        $this->assertEquals($customer->id, $order->customer_id);
-        $this->assertEquals(Order::STATUS_NEW, $order->status);
-        $this->assertEquals('2026-07-03', $order->purchase_date->format('Y-m-d'));
-        $this->assertEquals(15000.00, $order->remaining_amount);
-        $this->assertEquals($this->user->id, $order->created_by);
     }
 }

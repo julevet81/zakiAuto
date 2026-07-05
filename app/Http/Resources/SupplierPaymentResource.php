@@ -21,7 +21,6 @@ class SupplierPaymentResource extends JsonResource
             'batch_id' => $this->batch_id,
             'batch' => $this->whenLoaded('batch', fn () => [
                 'id' => $this->batch->id,
-                'batch_number' => $this->batch->batch_number,
                 'status' => $this->batch->status,
             ]),
             'supplier_id' => $this->supplier_id,

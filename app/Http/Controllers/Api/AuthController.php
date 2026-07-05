@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\UpdatePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Customer;
 use App\Models\User;
@@ -101,6 +102,28 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($user),
+        ]);
+    }
+
+    /**
+     * Update the authenticated user's password.
+     */
+    public function updatePassword(UpdatePasswordRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! Hash::check($request->validated('current_password'), $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['كلمة المرور الحالية غير صحيحة.'],
+            ]);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->validated('password')),
+        ]);
+
+        return response()->json([
+            'message' => 'تم تحديث كلمة المرور بنجاح.',
         ]);
     }
 

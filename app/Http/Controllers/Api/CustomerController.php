@@ -10,7 +10,6 @@ use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
 use App\Models\User;
-use App\Notifications\CustomerAccountCreated;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,64 +67,17 @@ class CustomerController extends Controller
      */
     public function store(StoreCustomerRequest $request): JsonResponse
     {
-        $plainPassword = Str::password(12); // e.g. "aB3$xQ9mLp2!"
+        $data = $request->validated();
 
-        $customer = DB::transaction(function () use ($request, $plainPassword) {
-            // 1. Create the User account.
-            $user = User::create([
-                'name'               => $request->validated('name'),
-                'email'              => $request->validated('email'),
-                'phone'              => $request->validated('phone'),
-                'password'           => Hash::make($plainPassword),
-                'is_active'          => true,
-                'email_verified_at'  => now(), // staff-created accounts are pre-verified
-            ]);
-
-            $user->assignRole('customer');
-
-            // 2. Determine agent_id.
-            $agentId = null;
-            if ($request->user()->can('customers.view')) {
-                // Admin/super-admin: use explicitly provided agent_id (may be null).
-                $agentId = $request->validated('agent_id');
-            } elseif ($request->user()->agent) {
-                // Agent creating a customer: auto-link to themselves.
-                $agentId = $request->user()->agent->id;
-            }
-
-            // 3. Create the Customer profile, linked to the new User.
-            $customer = Customer::create([
-                'user_id'     => $user->id,
-                'agent_id'    => $agentId,
-                'name'        => $request->validated('name'),
-                'email'       => $request->validated('email'),
-                'phone'       => $request->validated('phone'),
-                'national_id' => $request->validated('national_id'),
-                'passport_no' => $request->validated('passport_no'),
-                'address'     => $request->validated('address'),
-            ]);
-
-            return $customer;
-        });
-
-        // 4. Send credentials notification OUTSIDE the transaction so a
-        //    mail/queue failure doesn't roll back the created records.
-        //    The notification is queued (implements ShouldQueue), so this
-        //    line returns immediately even if the mail server is slow.
-        try {
-            $customer->user->notify(new CustomerAccountCreated($plainPassword));
-        } catch (\Throwable $e) {
-            // Log but don't fail the request — the account IS created.
-            // Staff can trigger a password reset manually if needed.
-            logger()->error('Failed to send customer account notification', [
-                'customer_id' => $customer->id,
-                'error'       => $e->getMessage(),
-            ]);
+        if (! $request->user()->can('customers.view') && $request->user()->agent) {
+            $data['agent_id'] = $request->user()->agent->id;
         }
 
+        $customer = Customer::create($data);
+
         return response()->json([
-            'message' => 'تم إنشاء حساب العميل وإرسال بيانات الدخول بنجاح',
-            'data'    => new CustomerResource($customer->load(['agent', 'user'])),
+            'message' => 'تم إضافة العميل بنجاح',
+            'data' => new CustomerResource($customer->load('agent')),
         ], 201);
     }
 
@@ -148,17 +100,9 @@ class CustomerController extends Controller
     {
         $customer->update($request->validated());
 
-        // Keep the linked User's name/phone in sync with the customer profile.
-        if ($customer->user) {
-            $customer->user->update(array_filter([
-                'name'  => $request->validated('name'),
-                'phone' => $request->validated('phone'),
-            ]));
-        }
-
         return response()->json([
             'message' => 'تم تحديث بيانات العميل بنجاح',
-            'data'    => new CustomerResource($customer->load('agent')),
+            'data' => new CustomerResource($customer->load('agent')),
         ]);
     }
 
@@ -177,7 +121,6 @@ class CustomerController extends Controller
         }
 
         DB::transaction(function () use ($customer) {
-            $customer->user?->delete(); // soft-delete the User account too
             $customer->delete();
         });
 

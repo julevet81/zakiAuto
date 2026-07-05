@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\BatchCarsImportFailedException;
 use App\Imports\BatchCarsImport;
 use App\Models\Batch;
 use App\Models\Car;
@@ -17,7 +18,6 @@ use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 class BatchCarsImportService
 {
-    // Column positions — see BatchCarsImport for the full documented map.
     private const COL_BRAND = 0;
     private const COL_MODEL = 1;
     private const COL_FINITION = 2;
@@ -33,13 +33,12 @@ class BatchCarsImportService
     private const COL_ARRIVAL_DATE = 12;
 
     /**
-     * Create the Batch, then import every car row from the uploaded file.
-     * Each row runs in its own DB transaction: a bad row (duplicate VIN,
-     * missing required field, ...) is skipped and reported, the rest of
-     * the file still imports.
+     * Create the Batch and import every car row from the uploaded file.
+     * The whole import is atomic: if any car row fails, all records created
+     * by this import are rolled back.
      *
-     * @param  array{supplier_id:int, container_opener_id:?int, batch_number:string, purchase_date:?string, total_cost_foreign:?float, notes:?string}  $data
-     * @return array{batch: Batch, created: int, skipped: int, errors: array<int, array{row:int, errors: array<int,string>}>}
+     * @param  array{supplier_id:int, container_opener_id:?int, purchase_date:?string, total_cost_foreign:?float, notes:?string}  $data
+     * @return array{batch: Batch, created: int, skipped: int, errors: array<int, array{row:int|null, errors: array<int,string>}>}
      */
     public function import(array $data, $file, int $createdBy): array
     {
@@ -49,48 +48,62 @@ class BatchCarsImportService
         $containerOpenerId = $data['container_opener_id'] ?? null;
         $supplierId = $data['supplier_id'];
 
-        // The batch itself is created up front from the manually-entered
-        // fields and kept even if every row below fails — an empty batch
-        // the staff can fix up is safer than silently discarding the
-        // supplier/batch_number/purchase_date they already filled in.
-        $batch = Batch::create([
-            'supplier_id' => $supplierId,
-            'batch_number' => $data['batch_number'],
-            'purchase_date' => $data['purchase_date'] ?? null,
-            'total_cost_foreign' => $data['total_cost_foreign'] ?? 0,
-            'notes' => $data['notes'] ?? null,
-            'status' => Batch::STATUS_PENDING,
-        ]);
+        return DB::transaction(function () use ($data, $import, $containerOpenerId, $supplierId, $createdBy) {
+            $batch = Batch::create([
+                'supplier_id' => $supplierId,
+                'purchase_date' => $data['purchase_date'] ?? null,
+                'total_cost_foreign' => $data['total_cost_foreign'] ?? 0,
+                'notes' => $data['notes'] ?? null,
+                'status' => Batch::STATUS_PARTIAL,
+            ]);
 
-        $created = 0;
-        $errors = [];
+            $created = 0;
+            $errors = [];
 
-        foreach ($import->rows as $index => $row) {
-            // +1 for the header row skipped by WithStartRow(2), +1 more
-            // because $index is 0-based — gives the real Excel row number.
-            $rowNumber = $index + 2;
-
-            try {
-                DB::transaction(function () use ($row, $batch, $containerOpenerId, $supplierId, $createdBy) {
-                    $this->importRow($row, $batch, $containerOpenerId, $supplierId, $createdBy);
-                });
-                $created++;
-            } catch (\Throwable $e) {
-                $errors[] = [
-                    'row' => $rowNumber,
-                    'errors' => [$e->getMessage()],
-                ];
+            if ($import->rows->isEmpty()) {
+                throw new BatchCarsImportFailedException([
+                    [
+                        'row' => null,
+                        'errors' => ['ملف الإكسل لا يحتوي على أي سيارات للاستيراد'],
+                    ],
+                ]);
             }
-        }
 
-        $batch->update(['cars_count' => $batch->cars()->count()]);
+            foreach ($import->rows as $index => $row) {
+                // WithStartRow(2) skips the header, so this maps back to Excel row numbers.
+                $rowNumber = $index + 2;
 
-        return [
-            'batch' => $batch->fresh(['supplier']),
-            'created' => $created,
-            'skipped' => count($errors),
-            'errors' => $errors,
-        ];
+                try {
+                    $this->importRow($row, $batch, $containerOpenerId, $supplierId, $createdBy);
+                    $created++;
+                } catch (\Throwable $e) {
+                    $errors[] = [
+                        'row' => $rowNumber,
+                        'errors' => [$e->getMessage()],
+                    ];
+                }
+            }
+
+            if ($errors !== [] || $created === 0) {
+                if ($created === 0 && $errors === []) {
+                    $errors[] = [
+                        'row' => null,
+                        'errors' => ['لم يتم إنشاء أي سيارة من ملف الإكسل'],
+                    ];
+                }
+
+                throw new BatchCarsImportFailedException($errors);
+            }
+
+            $batch->update(['cars_count' => $batch->cars()->count()]);
+
+            return [
+                'batch' => $batch->fresh(['supplier']),
+                'created' => $created,
+                'skipped' => 0,
+                'errors' => [],
+            ];
+        });
     }
 
     /**
@@ -112,9 +125,6 @@ class BatchCarsImportService
         $shippingCost = $row->get(self::COL_SHIPPING_COST);
         $arrivalDateRaw = $row->get(self::COL_ARRIVAL_DATE);
 
-        // --- Per-row validation. Throwing here rolls back only this row's
-        // transaction; the import loop catches it and moves to the next
-        // row (per the "skip bad rows, keep the rest" behaviour chosen). ---
         if ($brand === '' || $model === '') {
             throw new \RuntimeException('العلامة التجارية والموديل حقلان إلزاميان');
         }
@@ -133,13 +143,6 @@ class BatchCarsImportService
 
         $arrivalDate = $this->parseDate($arrivalDateRaw);
 
-        // --- Car ---
-        // NOTE / ASSUMPTION: the sheet has no "sale price" column. Since
-        // each car is sold to a named customer at import time, sale_price
-        // defaults here to foreign_purchase_price (0 margin) so the row is
-        // valid immediately. If you apply a standard markup, replace this
-        // with e.g. round($purchasePrice * 1.10, 2), or add a sale-price
-        // column to the sheet and read it like the other columns above.
         $car = Car::create([
             'batch_id' => $batch->id,
             'supplier_id' => $supplierId,
@@ -151,18 +154,13 @@ class BatchCarsImportService
             'color' => $color,
             'vin' => $vin,
             'foreign_purchase_price' => (float) $purchasePrice,
-            'sale_price' => (float) $purchasePrice, // see NOTE above
+            'sale_price' => (float) $purchasePrice,
             'tracking_number' => $trackingNumber,
             'arrival_date' => $arrivalDate,
-            'status' => Car::STATUS_RESERVED, // reserved for the customer created below
+            'status' => Car::STATUS_RESERVED,
         ]);
 
-        // --- Shipping cost line ---
         if (is_numeric($shippingCost) && (float) $shippingCost > 0) {
-            // ASSUMPTION: "تكلفة الشحن" in the sheet is already in local
-            // currency (paid domestically), so foreign_amount is 0. If it
-            // should instead be a foreign-currency cost, swap the two
-            // amounts / apply the batch exchange rate here.
             CarExpense::create([
                 'car_id' => $car->id,
                 'expense_type' => 'شحن',
@@ -171,8 +169,6 @@ class BatchCarsImportService
             ]);
         }
 
-        // --- Customer: match existing by national_id or passport_no,
-        // otherwise create a new customer record. ---
         $customer = null;
         if ($nationalId !== null) {
             $customer = Customer::where('national_id', $nationalId)->first();
@@ -188,7 +184,6 @@ class BatchCarsImportService
             ]);
         }
 
-        // --- Order ---
         Order::create([
             'order_number' => $this->generateOrderNumber(),
             'customer_id' => $customer->id,
@@ -216,8 +211,6 @@ class BatchCarsImportService
         }
 
         try {
-            // Excel stores dates as numeric serials in some export paths;
-            // handle both that and plain text dates.
             if (is_numeric($value)) {
                 return Date::excelToDateTimeObject($value)->format('Y-m-d');
             }

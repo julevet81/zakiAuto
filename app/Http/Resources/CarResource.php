@@ -35,7 +35,6 @@ class CarResource extends JsonResource
             'batch_id' => $this->when($canSeeOperationalData, $this->batch_id),
             'batch' => $this->when($canSeeOperationalData && $this->relationLoaded('batch'), fn() => [
                 'id'            => $this->batch->id,
-                'batch_number'  => $this->batch->batch_number,
                 'exchange_rate' => $this->batch->exchange_rate !== null
                     ? (float) $this->batch->exchange_rate
                     : null,
@@ -57,6 +56,7 @@ class CarResource extends JsonResource
             // operational visibility — an admin can see the supplier this
             // car came from (operational) but never this figure (cost).
             'foreign_purchase_price' => $this->when($canSeeCosts, (float) $this->foreign_purchase_price),
+            'exchange_rate' => $this->batch?->exchange_rate ?? null,
             'sale_price' => (float) $this->sale_price,
 
             'tracking_number' => $this->tracking_number,

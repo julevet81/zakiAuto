@@ -20,7 +20,6 @@ class StoreBatchRequest extends FormRequest
     {
         return [
             'supplier_id'         => ['required', 'integer', 'exists:suppliers,id'],
-            'batch_number'        => ['required', 'string', 'max:30', Rule::unique('batches', 'batch_number')],
             'purchase_date'       => ['nullable', 'date'],
 
             // Total agreed purchase cost in foreign currency — required for
@@ -34,10 +33,8 @@ class StoreBatchRequest extends FormRequest
             // Any submitted value is silently ignored (not in $fillable).
 
             'status'  => ['nullable', Rule::in([
-                Batch::STATUS_PENDING,
                 Batch::STATUS_PARTIAL,
                 Batch::STATUS_FULLY_PAID,
-                Batch::STATUS_COST_ALLOCATED,
             ])],
             'notes' => ['nullable', 'string'],
         ];

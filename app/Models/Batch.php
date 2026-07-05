@@ -14,17 +14,13 @@ class Batch extends Model
     /**
      * Lifecycle states for an import batch.
      */
-    public const STATUS_PENDING = 'pending';
 
     public const STATUS_PARTIAL = 'partial';
 
     public const STATUS_FULLY_PAID = 'fully_paid';
 
-    public const STATUS_COST_ALLOCATED = 'cost_allocated';
-
     protected $fillable = [
         'supplier_id',
-        'batch_number',
         'purchase_date',
         'total_cost_foreign',       // user-entered: total agreed cost in foreign currency
         'total_paid_amount_foreign', // auto-computed: sum of all supplier_payments.amount_foreign
@@ -153,9 +149,10 @@ class Batch extends Model
         $totalCost      = (float) ($this->total_cost_foreign  ?? 0);
 
         if ($paymentCount === 0 || $totalCost <= 0) {
-            // No payments recorded yet, or no target cost set — we have
-            // no data to derive a meaningful rate from.
-            $this->exchange_rate = null;
+            // No payments recorded yet, or no target cost set — we use the
+            // latest payment's exchange rate as a fallback.
+            $this->exchange_rate = $this->payments()->latest('id')->value('exchange_rate')
+                ?? \App\Models\SupplierPayment::latest('id')->value('exchange_rate');
         } else {
             $remainingForeign = max($totalCost - $totalForeign, 0.0);
 
@@ -170,6 +167,12 @@ class Batch extends Model
         // Always keep total_paid_amount_foreign in sync at the same time,
         // since we already fetched the aggregate — no extra query needed.
         $this->total_paid_amount_foreign = $totalForeign;
+
+        if ($totalCost > 0 && $this->total_paid_amount_foreign >= $totalCost) {
+            $this->status = self::STATUS_FULLY_PAID;
+        } else {
+            $this->status = self::STATUS_PARTIAL;
+        }
 
         if ($save) {
             $this->save();

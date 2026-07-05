@@ -223,17 +223,14 @@ class DemoDataSeeder extends Seeder
     private function seedBatches(array $suppliers): array
     {
         $statuses = [
-            Batch::STATUS_PENDING,
             Batch::STATUS_PARTIAL,
-            Batch::STATUS_FULLY_PAID,
-            Batch::STATUS_COST_ALLOCATED,
+            Batch::STATUS_FULLY_PAID
         ];
 
         $batches = [];
         foreach (range(1, 6) as $index) {
             $supplier = $suppliers[($index - 1) % count($suppliers)];
             $batches[] = Batch::query()->updateOrCreate(
-                ['batch_number' => 'BATCH-2026-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT)],
                 [
                     'supplier_id' => $supplier->id,
                     'purchase_date' => now()->subDays(120 - ($index * 12))->toDateString(),
@@ -378,7 +375,7 @@ class DemoDataSeeder extends Seeder
                 TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT,
                 $payment->id,
                 now()->subDays(60 - $index)->toDateString(),
-                'Supplier payment for '.$batch->batch_number
+                'Supplier payment for '.$batch->supplier->name.' (Batch ID: '.$batch->id.')'
             );
         }
     }

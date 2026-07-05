@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\BatchCarsImportFailedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Batch\StoreBatchRequest;
 use App\Http\Requests\Batch\UpdateBatchRequest;
@@ -23,9 +24,6 @@ class BatchController extends Controller
             ->withCount('cars')
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->integer('supplier_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('search'), function ($q) use ($request) {
-                $q->where('batch_number', 'like', '%'.$request->string('search').'%');
-            })
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 15));
 
@@ -36,7 +34,7 @@ class BatchController extends Controller
     {
         $batch = Batch::create(
             $request->validated()
-            + ['status' => $request->input('status', Batch::STATUS_PENDING)]
+            + ['status' => $request->input('status', Batch::STATUS_PARTIAL)]
         );
 
         // exchange_rate stays NULL at creation — no payments exist yet.
@@ -94,11 +92,23 @@ class BatchController extends Controller
 
     public function import(ImportBatchCarsRequest $request, BatchCarsImportService $importService): JsonResponse
     {
-        $result = $importService->import(
-            $request->validated(),
-            $request->file('file'),
-            $request->user()->id
-        );
+        try {
+            $result = $importService->import(
+                $request->validated(),
+                $request->file('file'),
+                $request->user()->id
+            );
+        } catch (BatchCarsImportFailedException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'data' => [
+                    'batch' => null,
+                    'created' => 0,
+                    'skipped' => count($e->errors()),
+                    'errors' => $e->errors(),
+                ],
+            ], 422);
+        }
 
         return response()->json([
             'message' => 'تم استيراد دفعة الاستيراد والسيارات بنجاح',

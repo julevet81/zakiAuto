@@ -649,7 +649,7 @@ paths:
       summary: تسجيل دفعة لمورد على دفعة استيراد محددة
       description: |
         ينشئ تلقائيًا حركة خزينة (out)، ويعيد حساب total_paid_amount_foreign
-        للدفعة، ويرقّي حالتها من pending إلى partial عند أول دفعة.
+        للدفعة، ويرقّي حالتها من partial إلى fully_paid عند اكتمال السداد.
       requestBody:
         required: true
         content:
@@ -719,7 +719,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [supplier_id, batch_number, file]
+              required: [supplier_id, file]
               properties:
                 supplier_id:
                   type: integer
@@ -730,10 +730,10 @@ paths:
                   description: معرف جهة فتح الحاوية
                   nullable: true
                   example: 1
-                batch_number:
-                  type: string
-                  description: رقم الدفعة الفريد
-                  example: "BATCH-2026-001"
+                exchange_rate:
+                  type: number
+                  description: سعر الصرف الحالي (لتحويل التكلفة الإجمالية للعملة المحلية)
+                  example: 3.75
                 purchase_date:
                   type: string
                   format: date
@@ -810,7 +810,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, partial, fully_paid, cost_allocated]
+            enum: [partial, fully_paid]
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -824,12 +824,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [supplier_id, batch_number, exchange_rate]
+              required: [supplier_id, purchase_date, exchange_rate]
               properties:
                 supplier_id:
                   type: integer
-                batch_number:
-                  type: string
                 purchase_date:
                   type: string
                   format: date
@@ -865,7 +863,7 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [pending, partial, fully_paid, cost_allocated]
+                  enum: [partial, fully_paid]
       responses:
         '200':
           description: تم التحديث بنجاح
