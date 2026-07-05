@@ -125,10 +125,12 @@ class BatchImportTest extends TestCase
         $order = Order::where('car_id', $car->id)->first();
         $this->assertNotNull($order);
         $this->assertEquals($customer->id, $order->customer_id);
-        $this->assertEquals(Order::STATUS_NEW, $order->status);
+        $this->assertEquals(Order::STATUS_SHIPPING, $order->status);
         $this->assertEquals('2026-07-03', $order->purchase_date->format('Y-m-d'));
+        $this->assertNotNull($order->shipping_date);
         $this->assertEquals(15000.00, $order->remaining_amount);
         $this->assertEquals($this->user->id, $order->created_by);
+        $this->assertEquals(\App\Models\Car::STATUS_SHIPPING, $car->fresh()->status);
     }
 
     public function test_import_failure_does_not_create_batch_or_cars(): void

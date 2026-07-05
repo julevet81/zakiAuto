@@ -61,18 +61,19 @@ class OrderController extends Controller
                 'customer_id' => $request->validated('customer_id'),
                 'car_id' => $request->validated('car_id'),
                 'agent_id' => $request->validated('agent_id'),
-                'status' => Order::STATUS_NEW,
+                'status' => Order::STATUS_SHIPPING,
                 'purchase_date' => $request->validated('purchase_date'),
+                'shipping_date' => now()->toDateString(),
                 'paid_amount' => 0,
                 'notes' => $request->validated('notes'),
                 'created_by' => $request->user()->id,
             ]);
 
-            $car = Car::find($order->car_id);
+            $car = Car::findByKey($order->car_id);
             $order->remaining_amount = (float) $car->sale_price;
             $order->save();
 
-            $car->update(['status' => Car::STATUS_RESERVED]);
+            $car->update(['status' => Car::STATUS_SHIPPING]);
 
             return $order;
         });

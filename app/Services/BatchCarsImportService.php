@@ -157,7 +157,7 @@ class BatchCarsImportService
             'sale_price' => (float) $purchasePrice,
             'tracking_number' => $trackingNumber,
             'arrival_date' => $arrivalDate,
-            'status' => Car::STATUS_RESERVED,
+            'status' => Car::STATUS_SHIPPING,
         ]);
 
         if (is_numeric($shippingCost) && (float) $shippingCost > 0) {
@@ -188,8 +188,9 @@ class BatchCarsImportService
             'order_number' => $this->generateOrderNumber(),
             'customer_id' => $customer->id,
             'car_id' => $car->id,
-            'status' => Order::STATUS_NEW,
+            'status' => Order::STATUS_SHIPPING,
             'purchase_date' => $batch->purchase_date,
+            'shipping_date' => now()->toDateString(),
             'arrival_date' => $arrivalDate,
             'paid_amount' => 0,
             'remaining_amount' => $car->sale_price,
