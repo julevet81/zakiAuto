@@ -18,11 +18,9 @@ class Car extends Model
      */
     public const STATUS_AVAILABLE = 'available';
 
-    public const STATUS_RESERVED = 'reserved';
-
     public const STATUS_SHIPPING = 'shipping';
 
-    public const STATUS_ARRIVED = 'arrived';
+    public const STATUS_IN_SHOW_ROOM = 'in_show_room';
 
     public const STATUS_DELIVERED = 'delivered';
 

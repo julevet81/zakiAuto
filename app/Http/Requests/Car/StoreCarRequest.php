@@ -41,9 +41,8 @@ class StoreCarRequest extends FormRequest
 
             'status' => ['nullable', Rule::in([
                 Car::STATUS_AVAILABLE,
-                Car::STATUS_RESERVED,
                 Car::STATUS_SHIPPING,
-                Car::STATUS_ARRIVED,
+                Car::STATUS_IN_SHOW_ROOM,
                 Car::STATUS_DELIVERED,
                 Car::STATUS_SOLD,
             ])],

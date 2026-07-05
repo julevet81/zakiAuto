@@ -19,7 +19,6 @@ class CustomerResource extends JsonResource
             'id'       => $this->id,
             'agent_id' => $this->agent_id,
             'agent'    => new AgentMiniResource($this->whenLoaded('agent')),
-
             'name'        => $this->name,
             'phone'       => $this->phone,
             'email'       => $this->email,
@@ -74,6 +73,8 @@ class CustomerResource extends JsonResource
                 'is_active'  => $this->user->is_active,
                 'last_login' => null, // extend later if you add last_login_at column
             ] : null),
+
+            'created_by' => $this->created_by,
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

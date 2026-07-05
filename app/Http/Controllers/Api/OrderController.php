@@ -66,7 +66,7 @@ class OrderController extends Controller
                 'shipping_date' => now()->toDateString(),
                 'paid_amount' => 0,
                 'notes' => $request->validated('notes'),
-                'created_by' => $request->user()->id,
+                'created_by' => $request->user()->name,
             ]);
 
             $car = Car::findOrFail($order->car_id);
