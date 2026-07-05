@@ -60,7 +60,7 @@ class BatchCarsImportService
             $created = 0;
             $errors = [];
 
-            if ($import->rows->isEmpty()) {
+            if ($import->getRows()->isEmpty()) {
                 throw new BatchCarsImportFailedException([
                     [
                         'row' => null,
@@ -69,7 +69,7 @@ class BatchCarsImportService
                 ]);
             }
 
-            foreach ($import->rows as $index => $row) {
+            foreach ($import->getRows() as $index => $row) {
                 // WithStartRow(2) skips the header, so this maps back to Excel row numbers.
                 $rowNumber = $index + 2;
 

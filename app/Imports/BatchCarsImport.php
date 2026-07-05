@@ -4,10 +4,56 @@ namespace App\Imports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 
 /**
- * Raw reader for the "batch cars" import sheet.
+ * Entry point handed to Excel::import().
+ *
+ * IMPORTANT: the uploaded workbook can contain more than one sheet (the
+ * shipped template has a "Batch Import" sheet with the car data AND a
+ * "Notes" sheet with free-text instructions). If this class only
+ * implemented ToCollection, Laravel Excel would invoke collection() once
+ * PER SHEET, and each call OVERWRITES $rows instead of appending to it —
+ * so whichever sheet is processed last silently wins, and the real car
+ * rows get replaced by garbage (or vice-versa depending on sheet order).
+ *
+ * WithMultipleSheets lets us pin the import to sheet index 0 ("Batch
+ * Import") explicitly. Any other sheet in the workbook (Notes, etc.) is
+ * simply never touched.
+ */
+class BatchCarsImport implements WithMultipleSheets
+{
+    public BatchCarsRowsImport $rowsImport;
+
+    public function __construct()
+    {
+        $this->rowsImport = new BatchCarsRowsImport();
+    }
+
+    /**
+     * @return array<int, object>
+     */
+    public function sheets(): array
+    {
+        return [
+            0 => $this->rowsImport,
+        ];
+    }
+
+    /**
+     * Convenience passthrough so callers can keep using $import->rows.
+     *
+     * @return Collection<int, Collection<int, mixed>>
+     */
+    public function getRows(): Collection
+    {
+        return $this->rowsImport->rows;
+    }
+}
+
+/**
+ * Raw reader for the actual "Batch Import" sheet.
  *
  * We deliberately do NOT use WithHeadingRow: the sheet's headers are Arabic
  * free text (e.g. "رقم الهيكل (VIN)") which does not slugify reliably into
@@ -34,7 +80,7 @@ use Maatwebsite\Excel\Concerns\WithStartRow;
  * Requires the maatwebsite/excel package:
  *   composer require maatwebsite/excel
  */
-class BatchCarsImport implements ToCollection, WithStartRow
+class BatchCarsRowsImport implements ToCollection, WithStartRow
 {
     /**
      * @var Collection<int, Collection<int, mixed>>

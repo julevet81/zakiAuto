@@ -98,7 +98,7 @@ return new class extends Migration
             $table->string('brand', 100);
             $table->string('model', 100);
             $table->string('finition', 255)->nullable();
-            $table->integer('manufacture_year');
+            $table->string('manufacture_year', 4);
             $table->string('color', 50)->nullable();
             $table->string('vin', 50)->unique()->nullable();
             $table->decimal('foreign_purchase_price', 15, 2); // local purchase price according to design notes
