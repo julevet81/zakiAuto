@@ -30,7 +30,7 @@ return new class extends Migration
             ->pluck('model_id');
 
         if ($customerUserIds->isNotEmpty()) {
-            if (Schema::hasTable('customers')) {
+            if (Schema::hasTable('customers') && Schema::hasColumn('customers', 'user_id')) {
                 DB::table('customers')
                     ->whereIn('user_id', $customerUserIds)
                     ->update(['user_id' => null]);

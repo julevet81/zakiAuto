@@ -28,7 +28,6 @@ class AuthController extends Controller
     {
         $customer = DB::transaction(function () use ($request) {
             return Customer::create([
-                'user_id' => null,
                 'agent_id' => null,
                 'name' => $request->validated('name'),
                 'email' => $request->validated('email'),

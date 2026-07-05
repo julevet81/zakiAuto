@@ -29,7 +29,6 @@ class CustomerSystemAccessTest extends TestCase
 
         $this->assertDatabaseHas('customers', [
             'email' => 'public-customer@zaki.com',
-            'user_id' => null,
         ]);
         $this->assertDatabaseMissing('users', [
             'email' => 'public-customer@zaki.com',

@@ -41,7 +41,6 @@ class OrderResource extends JsonResource
 
             'notes' => $this->notes,
 
-            'created_by' => $this->created_by,
             'creator' => $this->whenLoaded('creator', fn () => [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,

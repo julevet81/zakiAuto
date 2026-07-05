@@ -423,7 +423,7 @@ class DemoDataSeeder extends Seeder
             );
 
             $car->forceFill([
-                'status' => $status === Order::STATUS_DELIVERED ? Car::STATUS_SOLD : Car::STATUS_RESERVED,
+                'status' => $status === Order::STATUS_DELIVERED ? Car::STATUS_SOLD : Car::STATUS_IN_SHOW_ROOM,
             ])->save();
         }
 
@@ -436,12 +436,10 @@ class DemoDataSeeder extends Seeder
     private function seedCustomerPayments(array $orders): void
     {
         foreach ($orders as $index => $order) {
-            $firstAmount = round((float) $order->car->sale_price * 0.2, 2);
-            $secondAmount = round((float) $order->car->sale_price * (0.1 + ($index * 0.03)), 2);
-
             $payments = [
-                [$firstAmount, CustomerPayment::RECEIVED_BY_COMPANY, null, now()->subDays(25 - $index)->toDateString()],
-                [$secondAmount, $order->agent_id ? CustomerPayment::RECEIVED_BY_AGENT : CustomerPayment::RECEIVED_BY_COMPANY, $order->agent_id, now()->subDays(12 - $index)->toDateString()],
+                [round((float) $order->paid_amount * 0.5, 2), 'company', null, now()->subDays(20 - $index)->toDateString()],
+                [round((float) $order->paid_amount * 0.3, 2), 'agent', $order->agent_id, now()->subDays(15 - $index)->toDateString()],
+                [round((float) $order->paid_amount * 0.2, 2), 'company', null, now()->subDays(10 - $index)->toDateString()],
             ];
 
             foreach ($payments as $paymentData) {

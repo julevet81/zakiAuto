@@ -11,6 +11,7 @@ use App\Models\Car;
 use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -66,7 +67,7 @@ class OrderController extends Controller
                 'shipping_date' => now()->toDateString(),
                 'paid_amount' => 0,
                 'notes' => $request->validated('notes'),
-                'created_by' => $request->user()->name,
+                'created_by' => Auth::id(),
             ]);
 
             $car = Car::findOrFail($order->car_id);

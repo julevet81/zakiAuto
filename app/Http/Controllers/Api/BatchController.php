@@ -99,6 +99,10 @@ class BatchController extends Controller
                 $request->user()->id
             );
         } catch (BatchCarsImportFailedException $e) {
+            \Illuminate\Support\Facades\Log::warning('Batch cars import failed: ' . $e->getMessage(), [
+                'errors' => $e->errors(),
+            ]);
+
             return response()->json([
                 'message' => $e->getMessage(),
                 'data' => [

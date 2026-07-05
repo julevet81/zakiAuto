@@ -149,7 +149,7 @@ return new class extends Migration
             $table->foreignId('order_id')->constrained('orders')->onDelete('cascade');
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
             $table->decimal('amount', 15, 2);
-            $table->string('received_by', 20)->default('company'); // agent, company
+            $table->foreignId('received_by')->nullable()->constrained('users')->onDelete('set null');
             $table->foreignId('agent_id')->nullable()->constrained('agents')->onDelete('set null');
             $table->unsignedBigInteger('remittance_id')->nullable(); // will constrain later
             $table->string('attachment', 255)->nullable();

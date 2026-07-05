@@ -11,10 +11,6 @@ class CustomerPayment extends Model
 {
     use HasFactory, SoftDeletes;
 
-    public const RECEIVED_BY_COMPANY = 'company';
-
-    public const RECEIVED_BY_AGENT = 'agent';
-
     protected $fillable = [
         'order_id',
         'customer_id',
@@ -72,6 +68,6 @@ class CustomerPayment extends Model
 
     public function wasCollectedByAgent(): bool
     {
-        return $this->received_by === self::RECEIVED_BY_AGENT;
+        return $this->received_by === 'agent';
     }
 }

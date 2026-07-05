@@ -38,7 +38,6 @@ class CustomerCreateTest extends TestCase
             'email' => 'omar@zaki.com',
             'national_id' => '2514789632541785',
             'agent_id' => 2,
-            'user_id' => null,
         ]);
         $this->assertDatabaseMissing('users', [
             'email' => 'omar@zaki.com',

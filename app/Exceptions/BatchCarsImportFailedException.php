@@ -11,8 +11,20 @@ class BatchCarsImportFailedException extends RuntimeException
      */
     public function __construct(
         private readonly array $errors,
-        string $message = 'فشل استيراد الدفعة والسيارات. لم يتم إنشاء أي دفعة أو سيارات.'
+        ?string $message = null
     ) {
+        if ($message === null) {
+            $message = 'فشل استيراد الدفعة والسيارات. لم يتم إنشاء أي دفعة أو سيارات.';
+            if (!empty($errors)) {
+                $details = [];
+                foreach ($errors as $err) {
+                    $rowStr = isset($err['row']) ? "السطر {$err['row']}: " : "";
+                    $errList = implode(', ', $err['errors'] ?? []);
+                    $details[] = "{$rowStr}{$errList}";
+                }
+                $message .= ' التفاصيل: ' . implode(' | ', $details);
+            }
+        }
         parent::__construct($message);
     }
 
