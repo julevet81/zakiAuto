@@ -37,7 +37,6 @@ return new class extends Migration
         // 3. customers
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->foreignId('agent_id')->nullable()->constrained('agents')->onDelete('set null');
             $table->string('name', 150);
             $table->string('phone', 30)->nullable();

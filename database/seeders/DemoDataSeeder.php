@@ -133,7 +133,7 @@ class DemoDataSeeder extends Seeder
             return Customer::query()->updateOrCreate(
                 ['email' => $email],
                 [
-                    'user_id' => null,
+                    
                     'agent_id' => $agent?->id,
                     'name' => $name,
                     'phone' => $phone,

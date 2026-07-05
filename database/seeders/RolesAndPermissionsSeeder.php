@@ -118,7 +118,6 @@ class RolesAndPermissionsSeeder extends Seeder
         $superAdmin = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => $guard]);
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => $guard]);
         $agent = Role::firstOrCreate(['name' => 'agent', 'guard_name' => $guard]);
-        $customer = Role::where('name', 'customer')->where('guard_name', $guard)->first();
 
         // super-admin: everything, including role/permission management and user management.
         $superAdmin->syncPermissions(Permission::where('guard_name', $guard)->get());
@@ -154,9 +153,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dashboard.view',
         ]);
 
-        if ($customer) {
-            $customer->delete();
-        }
+        
 
         // ------------------------------------------------------------------
         // Default super-admin user, only created if it doesn't exist yet.

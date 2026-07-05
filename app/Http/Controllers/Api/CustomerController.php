@@ -69,7 +69,6 @@ class CustomerController extends Controller
         }
 
         $customer = Customer::create([
-            'user_id'     => null, // customers are not system users
             'agent_id'    => $agentId,
             'name'        => $request->validated('name'),
             'email'       => $request->validated('email'),

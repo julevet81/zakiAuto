@@ -13,7 +13,6 @@ class Customer extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
         'agent_id',
         'name',
         'phone',
@@ -23,13 +22,18 @@ class Customer extends Model
         'address',
     ];
 
-    /**
-     * The user account linked to this customer (nullable: a customer may be
-     * added by staff without ever logging in to the system).
-     */
-    public function user(): BelongsTo
+
+    protected function casts(): array
     {
-        return $this->belongsTo(User::class);
+        return [
+            'agent_id' => 'integer',
+            'name' => 'string',
+            'phone' => 'string',
+            'email' => 'string',
+            'national_id' => 'string',
+            'passport_no' => 'string',
+            'address' => 'string',
+        ];
     }
 
     /**

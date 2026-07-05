@@ -17,7 +17,6 @@ class CustomerResource extends JsonResource
     {
         return [
             'id'       => $this->id,
-            'user_id'  => $this->user_id,
             'agent_id' => $this->agent_id,
             'agent'    => new AgentMiniResource($this->whenLoaded('agent')),
 

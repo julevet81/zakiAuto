@@ -69,7 +69,7 @@ class OrderController extends Controller
                 'created_by' => $request->user()->id,
             ]);
 
-            $car = Car::findByKey($order->car_id);
+            $car = Car::findOrFail($order->car_id);
             $order->remaining_amount = (float) $car->sale_price;
             $order->save();
 
