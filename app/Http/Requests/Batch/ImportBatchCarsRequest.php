@@ -4,7 +4,6 @@ namespace App\Http\Requests\Batch;
 
 use App\Models\Batch;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class ImportBatchCarsRequest extends FormRequest
 {

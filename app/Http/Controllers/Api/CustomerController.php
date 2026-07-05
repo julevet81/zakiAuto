@@ -9,13 +9,9 @@ use App\Http\Resources\CustomerDocumentResource;
 use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
@@ -56,28 +52,36 @@ class CustomerController extends Controller
      * Create a customer account — full automated flow:
      *
      *  1. Generate a random secure password.
-     *  2. Create a User row (email + hashed password + role = customer).
-     *  3. Create the Customer row linked to that User.
-     *  4. Assign the agent (auto-link if the creator is an agent).
-     *  5. Notify the customer via email (and optionally SMS/WhatsApp —
-     *     see CustomerAccountCreated) with their login credentials.
+     * Create a customer profile record.
      *
-     * Steps 1–4 run inside a single DB transaction so a notification
-     * failure never leaves a half-created record behind.
+     * Customers are NOT system users — they have no login and no role.
+     * They track their orders via the public passport-lookup endpoint.
+     * This endpoint simply creates the customer profile (name, phone,
+     * passport, etc.) and optionally links them to an agent.
      */
     public function store(StoreCustomerRequest $request): JsonResponse
     {
-        $data = $request->validated();
-
-        if (! $request->user()->can('customers.view') && $request->user()->agent) {
-            $data['agent_id'] = $request->user()->agent->id;
+        $agentId = null;
+        if ($request->user()->can('customers.view')) {
+            $agentId = $request->validated('agent_id');
+        } elseif ($request->user()->agent) {
+            $agentId = $request->user()->agent->id;
         }
 
-        $customer = Customer::create($data);
+        $customer = Customer::create([
+            'user_id'     => null, // customers are not system users
+            'agent_id'    => $agentId,
+            'name'        => $request->validated('name'),
+            'email'       => $request->validated('email'),
+            'phone'       => $request->validated('phone'),
+            'national_id' => $request->validated('national_id'),
+            'passport_no' => $request->validated('passport_no'),
+            'address'     => $request->validated('address'),
+        ]);
 
         return response()->json([
             'message' => 'تم إضافة العميل بنجاح',
-            'data' => new CustomerResource($customer->load('agent')),
+            'data'    => new CustomerResource($customer->load('agent')),
         ], 201);
     }
 
@@ -87,7 +91,7 @@ class CustomerController extends Controller
 
         $customer->load(['agent', 'orders.car', 'customerDocuments']);
 
-        if ($request->user()->can('customer_payments.view') || $request->user()->can('customer_payments.view_own')) {
+        if ($request->user()->can('customer_payments.view')) {
             $customer->load('payments');
         }
 
@@ -100,9 +104,17 @@ class CustomerController extends Controller
     {
         $customer->update($request->validated());
 
+        // Keep the linked User's name/phone in sync with the customer profile.
+        if ($customer->user) {
+            $customer->user->update(array_filter([
+                'name'  => $request->validated('name'),
+                'phone' => $request->validated('phone'),
+            ]));
+        }
+
         return response()->json([
             'message' => 'تم تحديث بيانات العميل بنجاح',
-            'data' => new CustomerResource($customer->load('agent')),
+            'data'    => new CustomerResource($customer->load('agent')),
         ]);
     }
 
@@ -120,9 +132,7 @@ class CustomerController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($customer) {
-            $customer->delete();
-        });
+        $customer->delete($customer->id);
 
         return response()->json(['message' => 'تم حذف العميل بنجاح']);
     }
@@ -201,7 +211,7 @@ class CustomerController extends Controller
         }
 
         Storage::disk('public')->delete($document->file_path);
-        $document->delete();
+        $document->delete($customer->id);
 
         return response()->json(['message' => 'تم حذف الملف بنجاح']);
     }
