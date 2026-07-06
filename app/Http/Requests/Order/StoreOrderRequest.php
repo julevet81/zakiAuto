@@ -47,7 +47,7 @@ class StoreOrderRequest extends FormRequest
             $carId = $this->input('car_id');
 
             if ($carId) {
-                $car = Car::findByKey($carId);
+                $car = Car::find($carId);
 
                 if ($car) {
                     if ($car->order()->exists()) {
@@ -62,7 +62,7 @@ class StoreOrderRequest extends FormRequest
             $user = $this->user();
 
             if ($customerId && ! $user->can('customers.view') && $user->agent) {
-                $customer = \App\Models\Customer::findByKey($customerId);
+                $customer = \App\Models\Customer::find($customerId);
 
                 if ($customer && $customer->agent_id !== $user->agent->id) {
                     $validator->errors()->add('customer_id', 'لا يمكنك إنشاء طلب لعميل غير تابع لك');

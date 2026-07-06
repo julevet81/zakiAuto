@@ -151,8 +151,7 @@ class Batch extends Model
         if ($paymentCount === 0 || $totalCost <= 0) {
             // No payments recorded yet, or no target cost set — we use the
             // latest payment's exchange rate as a fallback.
-            $this->exchange_rate = $this->payments()->latest('id')->value('exchange_rate')
-                ?? \App\Models\SupplierPayment::latest('id')->value('exchange_rate');
+            $this->exchange_rate = $this->payments()->latest('id')->value('exchange_rate');
         } else {
             $remainingForeign = max($totalCost - $totalForeign, 0.0);
 
