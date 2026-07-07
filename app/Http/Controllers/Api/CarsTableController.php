@@ -89,7 +89,7 @@ class CarsTableController extends Controller
     protected function buildQuery(Request $request): Builder
     {
         return Car::query()
-            ->with(['order.customer'])
+            ->with(['order.customer', 'firstOrder.customer', 'currentOrder.customer'])
             ->withSum(['expenses as shipping_price_sum' => function ($q) {
                 $q->where(function ($q) {
                     $q->where('expense_type', 'like', '%شحن%')
@@ -130,6 +130,8 @@ class CarsTableController extends Controller
     protected function toRow(Car $car): array
     {
         $customer = $car->order?->customer;
+        $firstCustomer = $car->firstOrder?->customer;
+        $currentCustomer = $car->currentOrder?->customer;
 
         return [
             'id' => $car->id,
@@ -144,6 +146,12 @@ class CarsTableController extends Controller
             'customer_full_name' => $customer?->name,
             'customer_passport_no' => $customer?->passport_no,
             'customer_national_id' => $customer?->national_id,
+            'first_owner_name' => $firstCustomer?->name,
+            'first_owner_passport_no' => $firstCustomer?->passport_no,
+            'first_owner_national_id' => $firstCustomer?->national_id,
+            'current_owner_name' => $currentCustomer?->name,
+            'current_owner_passport_no' => $currentCustomer?->passport_no,
+            'current_owner_national_id' => $currentCustomer?->national_id,
             'shipping_price' => (float) ($car->shipping_price_sum ?? 0),
             'arrival_date' => $car->arrival_date?->format('Y-m-d'),
         ];
