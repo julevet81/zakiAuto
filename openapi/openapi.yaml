@@ -914,7 +914,9 @@ paths:
         صف واحد لكل سيارة بالأعمدة بالضبط: brand, model, finition,
         manufacture_year, color, vin, foreign_purchase_price,
         tracking_number, customer_full_name, customer_passport_no,
-        customer_national_id, shipping_price, arrival_date.
+        customer_national_id, first_owner_name, first_owner_passport_no,
+        first_owner_national_id, current_owner_name, current_owner_passport_no,
+        current_owner_national_id, shipping_price, arrival_date.
 
         هذا تقرير تكلفة بالكامل (يحتوي سعر الشراء وتكلفة الشحن)، لذا يتطلب
         صلاحية cars.view_cost كاملة وليس suppliers.view العامة، خلافًا
@@ -996,6 +998,24 @@ paths:
                           type: string
                           nullable: true
                         customer_national_id:
+                          type: string
+                          nullable: true
+                        first_owner_name:
+                          type: string
+                          nullable: true
+                        first_owner_passport_no:
+                          type: string
+                          nullable: true
+                        first_owner_national_id:
+                          type: string
+                          nullable: true
+                        current_owner_name:
+                          type: string
+                          nullable: true
+                        current_owner_passport_no:
+                          type: string
+                          nullable: true
+                        current_owner_national_id:
                           type: string
                           nullable: true
                         shipping_price:

@@ -59,6 +59,12 @@ class CarsTableExport implements FromQuery, WithHeadings, WithMapping, WithStyle
             'اسم العميل الكامل',
             'رقم جواز السفر',
             'رقم البطاقة الوطنية',
+            'المالك الأول',
+            'جواز سفر المالك الأول',
+            'الرقم الوطني للمالك الأول',
+            'المالك الحالي',
+            'جواز سفر المالك الحالي',
+            'الرقم الوطني للمالك الحالي',
             'تكلفة الشحن',
             'تاريخ الوصول',
         ];
@@ -71,6 +77,8 @@ class CarsTableExport implements FromQuery, WithHeadings, WithMapping, WithStyle
     public function map($car): array
     {
         $customer = $car->order?->customer;
+        $firstCustomer = $car->firstOrder?->customer;
+        $currentCustomer = $car->currentOrder?->customer;
 
         return [
             $car->brand,
@@ -84,6 +92,12 @@ class CarsTableExport implements FromQuery, WithHeadings, WithMapping, WithStyle
             $customer?->name,
             $customer?->passport_no,
             $customer?->national_id,
+            $firstCustomer?->name,
+            $firstCustomer?->passport_no,
+            $firstCustomer?->national_id,
+            $currentCustomer?->name,
+            $currentCustomer?->passport_no,
+            $currentCustomer?->national_id,
             // shipping_price_sum is pre-aggregated by the withSum() clause
             // on the query passed in from CarsTableController::buildQuery()
             // — NOT Car::getShippingPriceAttribute(), which would re-run a
@@ -100,7 +114,7 @@ class CarsTableExport implements FromQuery, WithHeadings, WithMapping, WithStyle
     {
         return [
             'G' => '#,##0.00', // foreign_purchase_price
-            'L' => '#,##0.00', // shipping_price
+            'R' => '#,##0.00', // shipping_price
         ];
     }
 
