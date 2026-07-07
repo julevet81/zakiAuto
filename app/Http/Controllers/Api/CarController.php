@@ -8,6 +8,7 @@ use App\Http\Requests\Car\StoreCarRequest;
 use App\Http\Requests\Car\UpdateCarRequest;
 use App\Http\Resources\CarExpenseResource;
 use App\Http\Resources\CarResource;
+use App\Http\Resources\CarOwnershipHistoryResource;
 use App\Models\Car;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -179,6 +180,23 @@ class CarController extends Controller
 
         return response()->json([
             'data' => CarExpenseResource::collection($car->expenses()->orderByDesc('id')->get()),
+        ]);
+    }
+
+    /**
+     * Get the ownership history of a car (all orders with their associated customers).
+     */
+    public function ownershipHistory(Request $request, Car $car): JsonResponse
+    {
+        $this->authorize('view', $car);
+
+        $orders = $car->orders()
+            ->with(['customer'])
+            ->orderBy('id', 'asc')
+            ->get();
+
+        return response()->json([
+            'data' => CarOwnershipHistoryResource::collection($orders),
         ]);
     }
 }

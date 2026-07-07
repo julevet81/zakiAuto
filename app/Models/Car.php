@@ -91,6 +91,14 @@ class Car extends Model
     }
 
     /**
+     * All orders placed on this car.
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
      * The single active order this car is sold under, if any.
      * A car is expected to belong to at most one (non-cancelled) order.
      */

@@ -1238,6 +1238,54 @@ paths:
         '201':
           description: تم إضافة المصروف بنجاح
 
+  /cars/{car}/ownership-history:
+    parameters:
+      - name: car
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Cars]
+      summary: تاريخ مالكي السيارة (الطلبات والعملاء المرتبطين بها)
+      description: يعرض قائمة بجميع الطلبات والعملاء الذين ارتبطوا بالسيارة عبر الزمن مرتبة تصاعدياً.
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        order_id:
+                          type: integer
+                        order_number:
+                          type: string
+                        status:
+                          type: string
+                        status_label:
+                          type: string
+                        purchase_date:
+                          type: string
+                          format: date
+                          nullable: true
+                        delivery_date:
+                          type: string
+                          format: date
+                          nullable: true
+                        customer:
+                          $ref: '#/components/schemas/Customer'
+                        created_at:
+                          type: string
+                          format: date-time
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /cars/{car}/documents:
     parameters:
       - name: car

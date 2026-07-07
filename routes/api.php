@@ -93,6 +93,7 @@ Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
 
     Route::apiResource('cars', CarController::class);
     Route::get('cars/{car}/expenses', [CarController::class, 'expenses']);
+    Route::get('cars/{car}/ownership-history', [CarController::class, 'ownershipHistory']);
     Route::post('cars/{car}/expenses', [CarController::class, 'storeExpense']);
 
     // وثائق السيارة (متداخلة، تعتمد على CarPolicy - راجع DocumentController)
