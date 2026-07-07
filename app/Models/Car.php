@@ -100,6 +100,23 @@ class Car extends Model
     }
 
     /**
+     * The first order ever placed on this car (first owner).
+     */
+    public function firstOrder(): HasOne
+    {
+        return $this->hasOne(Order::class)->oldestOfMany('id');
+    }
+
+    /**
+     * The most recent / current active order on this car (current owner).
+     * For a car sold only once, firstOrder === currentOrder.
+     */
+    public function currentOrder(): HasOne
+    {
+        return $this->hasOne(Order::class)->latestOfMany('id');
+    }
+
+    /**
      * Documents attached to this car (invoices, customs papers, photos...).
      */
     public function documents(): HasMany

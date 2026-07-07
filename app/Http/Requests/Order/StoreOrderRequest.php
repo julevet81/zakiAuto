@@ -50,9 +50,7 @@ class StoreOrderRequest extends FormRequest
                 $car = Car::find($carId);
 
                 if ($car) {
-                    if ($car->order()->exists()) {
-                        $validator->errors()->add('car_id', 'هذه السيارة مرتبطة بطلب آخر مسبقًا');
-                    } elseif (in_array($car->status, [Car::STATUS_SOLD, Car::STATUS_DELIVERED], true)) {
+                    if (in_array($car->status, [Car::STATUS_SOLD, Car::STATUS_DELIVERED], true)) {
                         $validator->errors()->add('car_id', 'هذه السيارة غير متاحة للبيع حاليًا');
                     }
                 }

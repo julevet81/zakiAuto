@@ -253,6 +253,36 @@ components:
           type: string
           nullable: true
 
+    CustomerDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        customer_id:
+          type: integer
+        title:
+          type: string
+        file_type:
+          type: string
+        file_size:
+          type: string
+        url:
+          type: string
+          format: uri
+        uploaded_by:
+          type: integer
+        uploader:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
     Agent:
       type: object
       properties:
@@ -1435,6 +1465,115 @@ paths:
           description: تم الحذف بنجاح
         '422':
           description: لا يمكن الحذف لوجود طلبات مرتبطة
+
+  /customers/{customer}/documents:
+    parameters:
+      - name: customer
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Customers]
+      summary: قائمة مستندات العميل
+      description: عرض جميع المستندات والملفات المرفوعة الخاصة بملف العميل.
+      responses:
+        '200':
+          description: نجح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomerDocument'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Customers]
+      summary: رفع مستندات لملف العميل (تحميل متعدد)
+      description: رفع ملف أو عدة ملفات (حتى 10 ملفات) وإضافتها إلى مستندات العميل.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  description: قائمة الملفات المراد رفعها (الحد الأقصى للملف الواحد 10 ميجابايت)
+                  items:
+                    type: string
+                    format: binary
+                titles:
+                  type: array
+                  description: عناوين اختيارية للملفات بنفس الترتيب
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: تم الرفع بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomerDocument'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /customers/{customer}/documents/{document}:
+    parameters:
+      - name: customer
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: document
+        in: path
+        required: true
+        schema:
+          type: integer
+    delete:
+      tags: [Customers]
+      summary: حذف مستند من ملف العميل
+      description: حذف مستند محدد من ملف العميل وحذف الملف الفيزيائي من السيرفر.
+      responses:
+        '200':
+          description: تم حذف الملف بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: تم حذف الملف بنجاح
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: الملف غير موجود أو لا ينتمي للعميل المحدد
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: الملف لا ينتمي لهذا العميل
 
   /agents:
     get:

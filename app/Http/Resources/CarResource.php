@@ -35,6 +35,7 @@ class CarResource extends JsonResource
             'batch_id' => $this->when($canSeeOperationalData, $this->batch_id),
             'batch' => $this->when($canSeeOperationalData && $this->relationLoaded('batch'), fn() => [
                 'id'            => $this->batch->id,
+                'batch_number'  => $this->batch->batch_number,
                 'exchange_rate' => $this->batch->exchange_rate !== null
                     ? (float) $this->batch->exchange_rate
                     : null,
@@ -56,7 +57,6 @@ class CarResource extends JsonResource
             // operational visibility — an admin can see the supplier this
             // car came from (operational) but never this figure (cost).
             'foreign_purchase_price' => $this->when($canSeeCosts, (float) $this->foreign_purchase_price),
-            'exchange_rate' => $this->batch?->exchange_rate ?? null,
             'sale_price' => (float) $this->sale_price,
 
             'tracking_number' => $this->tracking_number,
@@ -81,6 +81,24 @@ class CarResource extends JsonResource
 
             'is_sold' => $this->isSold(),
 
+            // ── Ownership history ─────────────────────────────────────────
+            // Visible to anyone with operational data access (admin+).
+            // Shows the first customer who ever bought this car and the
+            // current/most-recent owner — they differ only when a car was
+            // returned and re-sold, which is rare but possible.
+            'first_owner' => $this->when(
+                $canSeeOperationalData && $this->relationLoaded('firstOrder'),
+                fn() => $this->firstOrder
+                    ? $this->ownerPayload($this->firstOrder)
+                    : null
+            ),
+            'current_owner' => $this->when(
+                $canSeeOperationalData && $this->relationLoaded('currentOrder'),
+                fn() => $this->currentOrder
+                    ? $this->ownerPayload($this->currentOrder)
+                    : null
+            ),
+
             // The itemized expense list (shipping, customs, repairs...)
             // is cost-tier data even though "who can edit the car" is
             // broader — an admin can ADD an expense (cars.update) without
@@ -91,6 +109,37 @@ class CarResource extends JsonResource
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+        ];
+    }
+
+    /**
+     * Build the owner payload from an Order + its eager-loaded Customer.
+     *
+     * @param  \App\Models\Order  $order
+     * @return array<string, mixed>
+     */
+    protected function ownerPayload(\App\Models\Order $order): array
+    {
+        $customer = $order->customer; // eager-loaded via firstOrder.customer / currentOrder.customer
+
+        return [
+            // Order details
+            'order_number'  => $order->order_number,
+            'order_status'  => $order->status,
+            'purchase_date' => $order->purchase_date?->format('Y-m-d'),
+            'delivery_date' => $order->delivery_date?->format('Y-m-d'),
+            'paid_amount'   => (float) $order->paid_amount,
+
+            // Full customer details
+            'customer' => $customer ? [
+                'id'          => $customer->id,
+                'name'        => $customer->name,
+                'phone'       => $customer->phone,
+                'email'       => $customer->email,
+                'national_id' => $customer->national_id,
+                'passport_no' => $customer->passport_no,
+                'address'     => $customer->address,
+            ] : null,
         ];
     }
 }

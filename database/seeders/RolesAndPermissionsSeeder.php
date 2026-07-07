@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
@@ -145,7 +146,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.create',
             'customers.update',
             'orders.view_assigned',
-            'orders.create',
             'agent_transactions.view_own',
             'customer_payments.create',
             'customer_payments.view_own',
@@ -159,7 +159,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Default super-admin user, only created if it doesn't exist yet.
         // IMPORTANT: change this password immediately after first deploy.
         // ------------------------------------------------------------------
-        $user = \App\Models\User::firstOrCreate(
+        $user = User::firstOrCreate(
             ['email' => 'superadmin@zaki.com'],
             [
                 'name' => 'Super Admin',

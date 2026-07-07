@@ -79,7 +79,14 @@ class CarController extends Controller
         $car->load(['documents']);
 
         if ($canSeeOperationalData) {
-            $car->load(['supplier', 'containerOpener', 'order']);
+            $car->load([
+                'supplier',
+                'containerOpener',
+                'order',
+                // First and current owner with full customer details
+                'firstOrder.customer',
+                'currentOrder.customer',
+            ]);
         }
         if ($canSeeCosts) {
             $car->load(['expenses', 'generalExpenses']);
