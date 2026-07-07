@@ -87,13 +87,13 @@ class CarResource extends JsonResource
             // current/most-recent owner — they differ only when a car was
             // returned and re-sold, which is rare but possible.
             'first_owner' => $this->when(
-                $canSeeOperationalData && $this->relationLoaded('firstOrder'),
+                $this->relationLoaded('firstOrder'),
                 fn() => $this->firstOrder && $this->firstOrder->customer
                     ? new CustomerResource($this->firstOrder->customer)
                     : null
             ),
             'current_owner' => $this->when(
-                $canSeeOperationalData && $this->relationLoaded('currentOrder'),
+                $this->relationLoaded('currentOrder'),
                 fn() => $this->currentOrder && $this->currentOrder->customer
                     ? new CustomerResource($this->currentOrder->customer)
                     : null

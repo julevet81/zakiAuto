@@ -109,7 +109,7 @@ class CarOwnerDisplayTest extends TestCase
             ->assertJsonPath('data.0.current_owner.name', $customer2->name);
     }
 
-    public function test_unauthorized_user_cannot_view_ownership_data(): void
+    public function test_agent_can_view_ownership_data(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -168,13 +168,13 @@ class CarOwnerDisplayTest extends TestCase
         // GET single car
         $response = $this->getJson("/api/cars/{$car->id}");
         $response->assertOk()
-            ->assertJsonMissingPath('data.first_owner')
-            ->assertJsonMissingPath('data.current_owner');
+            ->assertJsonPath('data.first_owner.id', $customer->id)
+            ->assertJsonPath('data.first_owner.name', $customer->name);
 
         // GET cars list
         $responseList = $this->getJson('/api/cars');
         $responseList->assertOk()
-            ->assertJsonMissingPath('data.0.first_owner')
-            ->assertJsonMissingPath('data.0.current_owner');
+            ->assertJsonPath('data.0.first_owner.id', $customer->id)
+            ->assertJsonPath('data.0.first_owner.name', $customer->name);
     }
 }

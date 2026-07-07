@@ -30,12 +30,14 @@ class CarController extends Controller
         $canSeeOperationalData = $user->can('suppliers.view');
 
         $query = Car::query()
+            ->with([
+                'firstOrder.customer',
+                'currentOrder.customer',
+            ])
             ->when($canSeeOperationalData, fn($q) => $q->with([
                 'supplier',
                 'containerOpener',
                 'batch:id,exchange_rate,status', // exchange_rate مطلوب صريحاً
-                'firstOrder.customer',
-                'currentOrder.customer',
             ]))
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))
@@ -67,13 +69,12 @@ class CarController extends Controller
         $user = $request->user();
         $canSeeOperationalData = $user && $user->can('suppliers.view');
 
-        $car->load(['supplier', 'containerOpener']);
-        if ($canSeeOperationalData) {
-            $car->load([
-                'firstOrder.customer',
-                'currentOrder.customer',
-            ]);
-        }
+        $car->load([
+            'supplier',
+            'containerOpener',
+            'firstOrder.customer',
+            'currentOrder.customer',
+        ]);
 
         return response()->json([
             'message' => 'تم إضافة السيارة بنجاح',
@@ -89,16 +90,17 @@ class CarController extends Controller
         $canSeeOperationalData = $user->can('suppliers.view');
         $canSeeCosts = $user->can('cars.view_cost');
 
-        $car->load(['documents']);
+        $car->load([
+            'documents',
+            'firstOrder.customer',
+            'currentOrder.customer',
+        ]);
 
         if ($canSeeOperationalData) {
             $car->load([
                 'supplier',
                 'containerOpener',
                 'order',
-                // First and current owner with full customer details
-                'firstOrder.customer',
-                'currentOrder.customer',
             ]);
         }
         if ($canSeeCosts) {
@@ -117,13 +119,12 @@ class CarController extends Controller
         $user = $request->user();
         $canSeeOperationalData = $user && $user->can('suppliers.view');
 
-        $car->load(['supplier', 'containerOpener']);
-        if ($canSeeOperationalData) {
-            $car->load([
-                'firstOrder.customer',
-                'currentOrder.customer',
-            ]);
-        }
+        $car->load([
+            'supplier',
+            'containerOpener',
+            'firstOrder.customer',
+            'currentOrder.customer',
+        ]);
 
         return response()->json([
             'message' => 'تم تحديث بيانات السيارة بنجاح',
