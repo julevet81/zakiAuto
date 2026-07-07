@@ -88,14 +88,14 @@ class CarResource extends JsonResource
             // returned and re-sold, which is rare but possible.
             'first_owner' => $this->when(
                 $canSeeOperationalData && $this->relationLoaded('firstOrder'),
-                fn() => $this->firstOrder
-                    ? $this->ownerPayload($this->firstOrder)
+                fn() => $this->firstOrder && $this->firstOrder->customer
+                    ? new CustomerResource($this->firstOrder->customer)
                     : null
             ),
             'current_owner' => $this->when(
                 $canSeeOperationalData && $this->relationLoaded('currentOrder'),
-                fn() => $this->currentOrder
-                    ? $this->ownerPayload($this->currentOrder)
+                fn() => $this->currentOrder && $this->currentOrder->customer
+                    ? new CustomerResource($this->currentOrder->customer)
                     : null
             ),
 
@@ -109,37 +109,6 @@ class CarResource extends JsonResource
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
-        ];
-    }
-
-    /**
-     * Build the owner payload from an Order + its eager-loaded Customer.
-     *
-     * @param  \App\Models\Order  $order
-     * @return array<string, mixed>
-     */
-    protected function ownerPayload(\App\Models\Order $order): array
-    {
-        $customer = $order->customer; // eager-loaded via firstOrder.customer / currentOrder.customer
-
-        return [
-            // Order details
-            'order_number'  => $order->order_number,
-            'order_status'  => $order->status,
-            'purchase_date' => $order->purchase_date?->format('Y-m-d'),
-            'delivery_date' => $order->delivery_date?->format('Y-m-d'),
-            'paid_amount'   => (float) $order->paid_amount,
-
-            // Full customer details
-            'customer' => $customer ? [
-                'id'          => $customer->id,
-                'name'        => $customer->name,
-                'phone'       => $customer->phone,
-                'email'       => $customer->email,
-                'national_id' => $customer->national_id,
-                'passport_no' => $customer->passport_no,
-                'address'     => $customer->address,
-            ] : null,
         ];
     }
 }

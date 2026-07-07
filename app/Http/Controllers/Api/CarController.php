@@ -34,6 +34,8 @@ class CarController extends Controller
                 'supplier',
                 'containerOpener',
                 'batch:id,exchange_rate,status', // exchange_rate مطلوب صريحاً
+                'firstOrder.customer',
+                'currentOrder.customer',
             ]))
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))
@@ -62,9 +64,20 @@ class CarController extends Controller
     {
         $car = Car::create($request->validated() + ['status' => $request->input('status', Car::STATUS_AVAILABLE)]);
 
+        $user = $request->user();
+        $canSeeOperationalData = $user && $user->can('suppliers.view');
+
+        $car->load(['supplier', 'containerOpener']);
+        if ($canSeeOperationalData) {
+            $car->load([
+                'firstOrder.customer',
+                'currentOrder.customer',
+            ]);
+        }
+
         return response()->json([
             'message' => 'تم إضافة السيارة بنجاح',
-            'data' => new CarResource($car->load(['supplier', 'containerOpener'])),
+            'data' => new CarResource($car),
         ], 201);
     }
 
@@ -101,9 +114,20 @@ class CarController extends Controller
     {
         $car->update($request->validated());
 
+        $user = $request->user();
+        $canSeeOperationalData = $user && $user->can('suppliers.view');
+
+        $car->load(['supplier', 'containerOpener']);
+        if ($canSeeOperationalData) {
+            $car->load([
+                'firstOrder.customer',
+                'currentOrder.customer',
+            ]);
+        }
+
         return response()->json([
             'message' => 'تم تحديث بيانات السيارة بنجاح',
-            'data' => new CarResource($car->load(['supplier', 'containerOpener'])),
+            'data' => new CarResource($car),
         ]);
     }
 
