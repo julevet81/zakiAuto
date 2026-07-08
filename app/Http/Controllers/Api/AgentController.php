@@ -9,8 +9,11 @@ use App\Http\Resources\AgentResource;
 use App\Http\Resources\AgentTransactionResource;
 use App\Http\Resources\CustomerResource;
 use App\Models\Agent;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AgentController extends Controller
 {
@@ -34,7 +37,29 @@ class AgentController extends Controller
 
     public function store(StoreAgentRequest $request): JsonResponse
     {
-        $agent = Agent::create($request->validated());
+        $agent = DB::transaction(function () use ($request) {
+            $data = $request->validated();
+
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+                'password' => Hash::make($data['password']),
+                'is_active' => $data['is_active'] ?? true,
+                'email_verified_at' => now(),
+            ]);
+
+            $user->assignRole('agent');
+
+            return Agent::create([
+                'user_id' => $user->id,
+                'name' => $data['name'],
+                'phone' => $data['phone'] ?? null,
+                'email' => $data['email'],
+                'address' => $data['address'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+        });
 
         return response()->json([
             'message' => 'تم إضافة الوكيل بنجاح',

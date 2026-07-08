@@ -20,13 +20,11 @@ class StoreAgentRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:150'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:150'],
+            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')],
+            'password' => ['required', 'string', 'min:8'],
+            'is_active' => ['boolean'],
             'address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
-            // Linking an existing user account to this agent is optional
-            // and admin-only (agents/customers themselves never reach
-            // this endpoint — only admin/super-admin hold agents.create).
-            'user_id' => ['nullable', 'integer', 'exists:users,id', Rule::unique('agents', 'user_id')],
         ];
     }
 }

@@ -31,14 +31,11 @@ class StoreOrderRequest extends FormRequest
     /**
      * Cross-field / business-rule validation:
      *
-     *  1. The chosen car must not already be tied to another order. The
-     *     `orders` migration has NO unique constraint on car_id (verified
-     *     against the uploaded migration), so this rule is the only thing
-     *     preventing the same car from being sold to two customers at
-     *     once — enforced here at the application layer instead.
-     *  2. The car must not already be marked `sold` / `delivered`.
-     *  3. If the requester is an agent (not a full customers.view admin),
-     *     the chosen customer must actually belong to them — an agent
+     *  1. The car must not already be marked `sold` / `delivered`.
+     *     Multiple orders for the same car are allowed so ownership can be
+     *     transferred; OrderController decides whether that makes the car sold.
+     *  2. If the requester is an agent (not a full customers.view admin),
+     *     the chosen customer must actually belong to them - an agent
      *     cannot create an order on behalf of a customer they don't manage.
      */
     public function withValidator(Validator $validator): void

@@ -50,31 +50,45 @@ class OrderController extends Controller
 
     /**
      * Create a new order linking a customer, a car, and (optionally) an
-     * agent. Marks the car as `reserved` so it stops showing up in the
-     * public catalogue (see CarController::index scoping) while the sale
-     * is in progress, without yet being `sold`.
+     * agent. The first order keeps the car in `shipping`, which is still
+     * available for sale. A later order for a different customer is treated
+     * as an ownership transfer and marks the car as `sold`.
      */
     public function store(StoreOrderRequest $request): JsonResponse
     {
         $order = DB::transaction(function () use ($request) {
+            $data = $request->validated();
+            $car = Car::query()
+                ->whereKey($data['car_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $firstOwnerCustomerId = $car->orders()
+                ->oldest('id')
+                ->value('customer_id');
+
+            $isOwnershipTransfer = $firstOwnerCustomerId !== null
+                && (int) $firstOwnerCustomerId !== (int) $data['customer_id'];
+
             $order = Order::create([
                 'order_number' => $this->generateOrderNumber(),
-                'customer_id' => $request->validated('customer_id'),
-                'car_id' => $request->validated('car_id'),
-                'agent_id' => $request->validated('agent_id'),
+                'customer_id' => $data['customer_id'],
+                'car_id' => $data['car_id'],
+                'agent_id' => $data['agent_id'] ?? null,
                 'status' => Order::STATUS_SHIPPING,
-                'purchase_date' => $request->validated('purchase_date'),
+                'purchase_date' => $data['purchase_date'] ?? null,
                 'shipping_date' => now()->toDateString(),
                 'paid_amount' => 0,
-                'notes' => $request->validated('notes'),
+                'notes' => $data['notes'] ?? null,
                 'created_by' => Auth::id(),
             ]);
 
-            $car = Car::findOrFail($order->car_id);
             $order->remaining_amount = (float) $car->sale_price;
             $order->save();
 
-            $car->update(['status' => Car::STATUS_SHIPPING]);
+            $car->update([
+                'status' => $isOwnershipTransfer ? Car::STATUS_SOLD : Car::STATUS_SHIPPING,
+            ]);
 
             return $order;
         });
@@ -160,7 +174,7 @@ class OrderController extends Controller
      * Delete an order. Blocked if any payment has already been recorded
      * against it — cancelling a paid order should go through a refund /
      * void process, not a hard delete. Also frees the car back to
-     * `available` so it can be re-sold.
+     * `shipping` so it can be re-sold under the new default workflow.
      */
     public function destroy(Order $order): JsonResponse
     {
@@ -173,7 +187,7 @@ class OrderController extends Controller
         }
 
         DB::transaction(function () use ($order) {
-            $order->car?->update(['status' => Car::STATUS_AVAILABLE]);
+            $order->car?->update(['status' => Car::STATUS_SHIPPING]);
             $order->delete();
         });
 

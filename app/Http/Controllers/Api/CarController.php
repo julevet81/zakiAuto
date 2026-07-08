@@ -65,7 +65,7 @@ class CarController extends Controller
 
     public function store(StoreCarRequest $request): JsonResponse
     {
-        $car = Car::create($request->validated() + ['status' => $request->input('status', Car::STATUS_AVAILABLE)]);
+        $car = Car::create($request->validated() + ['status' => $request->input('status', Car::STATUS_SHIPPING)]);
 
         $user = $request->user();
         $canSeeOperationalData = $user && $user->can('suppliers.view');
