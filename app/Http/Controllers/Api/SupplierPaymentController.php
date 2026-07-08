@@ -24,7 +24,7 @@ class SupplierPaymentController extends Controller
         $this->authorize('viewAny', SupplierPayment::class);
 
         $payments = SupplierPayment::query()
-            ->with(['supplier:id,name,phone', 'batch:id,batch_number,status,exchange_rate'])
+            ->with(['supplier:id,name,phone', 'batch:id,status,exchange_rate'])
             ->when($request->filled('supplier_id'), fn($q) => $q->where('supplier_id', $request->integer('supplier_id')))
             ->when($request->filled('batch_id'), fn($q) => $q->where('batch_id', $request->integer('batch_id')))
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
@@ -149,7 +149,7 @@ class SupplierPaymentController extends Controller
 
                 $this->syncBatch($batch->id);
 
-                $createdPayments[] = $payment->load(['batch:id,batch_number,status,exchange_rate', 'supplier:id,name']);
+                $createdPayments[] = $payment->load(['batch:id,status,exchange_rate', 'supplier:id,name']);
             }
 
             // Capture any amount that exceeded all open batches.
@@ -179,7 +179,6 @@ class SupplierPaymentController extends Controller
             'message'          => 'تم توزيع الدفعة على ' . count($createdPayments) . ' دفعة/دفعات استيراد بنجاح (FIFO)',
             'payments_created' => SupplierPaymentResource::collection(collect($createdPayments)),
             'distribution_summary' => collect($createdPayments)->map(fn($p) => [
-                'batch_number'   => $p->batch->batch_number ?? '—',
                 'batch_status'   => $p->batch->status       ?? '—',
                 'amount_foreign' => (float) $p->amount_foreign,
                 'amount_local'   => (float) $p->amount_local,

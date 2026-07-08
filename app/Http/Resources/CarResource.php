@@ -35,7 +35,6 @@ class CarResource extends JsonResource
             'batch_id' => $this->when($canSeeOperationalData, $this->batch_id),
             'batch' => $this->when($canSeeOperationalData && $this->relationLoaded('batch'), fn() => [
                 'id'            => $this->batch->id,
-                'batch_number'  => $this->batch->batch_number,
                 'exchange_rate' => $this->batch->exchange_rate !== null
                     ? (float) $this->batch->exchange_rate
                     : null,
