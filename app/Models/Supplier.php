@@ -49,4 +49,14 @@ class Supplier extends Model
     {
         return (float) $this->payments()->sum('amount_local');
     }
+
+    /**
+     * Total foreign amount still owed to this supplier across import batches.
+     */
+    public function getTotalRemainingAttribute(): float
+    {
+        return (float) $this->batches()
+            ->selectRaw('COALESCE(SUM(CASE WHEN total_cost_foreign > total_paid_amount_foreign THEN total_cost_foreign - total_paid_amount_foreign ELSE 0 END), 0) as aggregate')
+            ->value('aggregate');
+    }
 }

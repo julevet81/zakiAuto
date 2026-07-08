@@ -48,10 +48,13 @@ class CustomerResource extends JsonResource
             ),
             'total_remaining' => $this->when(
                 isset($this->total_remaining_sum)
+                    || $this->relationLoaded('orders')
                     || ($request->boolean('with_stats') && $request->user()?->can('orders.view')),
                 fn() => isset($this->total_remaining_sum)
                     ? (float) $this->total_remaining_sum
-                    : (float) $this->total_remaining
+                    : ($this->relationLoaded('orders')
+                        ? (float) $this->orders->sum('remaining_amount')
+                        : (float) $this->total_remaining)
             ),
 
             // Uses OrderWithCarResource (not OrderMiniResource) so that

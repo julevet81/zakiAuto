@@ -37,6 +37,12 @@ class SupplierResource extends JsonResource
                 $request->boolean('with_stats'),
                 fn () => (float) $this->total_paid
             ),
+            'total_remaining' => $this->when(
+                $request->boolean('with_stats') || $this->relationLoaded('batches'),
+                fn () => round($this->relationLoaded('batches')
+                    ? $this->batches->sum(fn ($batch) => max((float) $batch->total_cost_foreign - (float) $batch->total_paid_amount_foreign, 0))
+                    : (float) $this->total_remaining, 2)
+            ),
 
             'batches' => BatchResource::collection($this->whenLoaded('batches')),
             'cars' => CarResource::collection($this->whenLoaded('cars')),
