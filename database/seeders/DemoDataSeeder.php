@@ -254,16 +254,16 @@ class DemoDataSeeder extends Seeder
     {
         $rows = [
             ['Toyota', 'Corolla', 'Hybrid Active', 2022, 'White', 12200, 15800, Car::STATUS_AVAILABLE],
-            ['Hyundai', 'Tucson', 'Comfort', 2021, 'Gray', 16800, 21400, Car::STATUS_RESERVED],
+            ['Hyundai', 'Tucson', 'Comfort', 2021, 'Gray', 16800, 21400, Car::STATUS_AVAILABLE],
             ['Kia', 'Sportage', 'GT Line', 2023, 'Black', 19700, 25200, Car::STATUS_SHIPPING],
-            ['Volkswagen', 'Golf', 'Life', 2020, 'Blue', 14200, 18400, Car::STATUS_ARRIVED],
+            ['Volkswagen', 'Golf', 'Life', 2020, 'Blue', 14200, 18400, Car::STATUS_AVAILABLE],
             ['Renault', 'Clio', 'Intens', 2022, 'Red', 9800, 13200, Car::STATUS_DELIVERED],
             ['Mercedes-Benz', 'C200', 'Avantgarde', 2021, 'Silver', 31500, 39800, Car::STATUS_SOLD],
             ['BMW', 'X1', 'xDrive', 2022, 'White', 28600, 36500, Car::STATUS_SOLD],
             ['Peugeot', '3008', 'Allure', 2023, 'Green', 22100, 28900, Car::STATUS_AVAILABLE],
             ['Nissan', 'Qashqai', 'Tekna', 2020, 'Black', 15100, 19900, Car::STATUS_SHIPPING],
             ['Audi', 'A3', 'S Line', 2021, 'Gray', 23600, 30600, Car::STATUS_SOLD],
-            ['Skoda', 'Octavia', 'Style', 2022, 'Blue', 17300, 22800, Car::STATUS_RESERVED],
+            ['Skoda', 'Octavia', 'Style', 2022, 'Blue', 17300, 22800, Car::STATUS_AVAILABLE],
             ['Ford', 'Kuga', 'Titanium', 2021, 'White', 18100, 23900, Car::STATUS_AVAILABLE],
         ];
 
@@ -455,20 +455,6 @@ class DemoDataSeeder extends Seeder
                         'created_by' => $this->admin->id,
                     ]
                 );
-
-                if ($receivedBy === CustomerPayment::RECEIVED_BY_AGENT && $agentId) {
-                    $agentTransaction = $this->agentTransaction($agentId, $payment, $date);
-                    $payment->forceFill(['remittance_id' => $agentTransaction->id])->save();
-                } else {
-                    $this->treasury(
-                        TreasuryTransaction::DIRECTION_IN,
-                        $amount,
-                        TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
-                        $payment->id,
-                        $date,
-                        'Customer payment for '.$order->order_number
-                    );
-                }
             }
 
             $order->recalculateBalance();
@@ -522,6 +508,7 @@ class DemoDataSeeder extends Seeder
     {
         foreach ($orders as $index => $order) {
             $provider = $serviceProviders[$index % count($serviceProviders)];
+            $expenseDate = now()->subDays(9 - $index)->toDateString();
             $expense = Expense::query()->updateOrCreate(
                 ['order_id' => $order->id, 'expense_type' => 'Delivery paperwork'],
                 [
@@ -529,7 +516,7 @@ class DemoDataSeeder extends Seeder
                     'service_provider_id' => $provider->id,
                     'amount' => 8500 + ($index * 1300),
                     'attachment' => 'demo/expenses/order-'.$order->id.'.pdf',
-                    'expense_date' => now()->subDays(9 - $index)->toDateString(),
+                    'expense_date' => $expenseDate,
                     'notes' => 'Demo order expense.',
                     'created_by' => $this->admin->id,
                 ]
@@ -540,7 +527,7 @@ class DemoDataSeeder extends Seeder
                 (float) $expense->amount,
                 TreasuryTransaction::SOURCE_EXPENSE,
                 $expense->id,
-                $expense->expense_date->toDateString(),
+                $expenseDate,
                 'Expense for order '.$order->order_number
             );
         }

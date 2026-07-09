@@ -22,7 +22,7 @@ class UpdateExpenseRequest extends FormRequest
             'service_provider_id' => ['nullable', 'integer', 'exists:service_providers,id'],
             'expense_type' => ['sometimes', 'required', 'string', 'max:100'],
             'amount' => ['sometimes', 'required', 'numeric', 'min:0.01'],
-            'attachment' => ['nullable', 'string', 'max:255'],
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,doc,docx,xls,xlsx', 'max:2048'],
             'expense_date' => ['sometimes', 'required', 'date'],
             'notes' => ['nullable', 'string'],
         ];

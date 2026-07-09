@@ -24,15 +24,9 @@ class StoreCustomerPaymentRequest extends FormRequest
             'order_id' => ['required', 'integer', 'exists:orders,id'],
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'received_by' => ['required', Rule::in([
-                CustomerPayment::RECEIVED_BY_COMPANY,
-                CustomerPayment::RECEIVED_BY_AGENT,
-            ])],
             // Required only when an agent physically collected the cash.
             'agent_id' => [
-                'nullable', 'integer', 'exists:agents,id',
-                Rule::requiredIf($this->input('received_by') === CustomerPayment::RECEIVED_BY_AGENT),
-            ],
+                'nullable', 'integer', 'exists:agents,id'],
             'attachment' => ['nullable', 'string', 'max:255'],
             'payment_date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
