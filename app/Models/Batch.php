@@ -20,6 +20,7 @@ class Batch extends Model
     public const STATUS_FULLY_PAID = 'fully_paid';
 
     protected $fillable = [
+        'batch_number',
         'supplier_id',
         'purchase_date',
         'total_cost_foreign',       // user-entered: total agreed cost in foreign currency
@@ -32,6 +33,24 @@ class Batch extends Model
         'cars_count',
         'notes',
     ];
+
+    protected static function booted(): void
+    {
+        static::created(function (Batch $batch): void {
+            if ($batch->batch_number !== null) {
+                return;
+            }
+
+            $batch->forceFill([
+                'batch_number' => static::makeBatchNumber($batch->id),
+            ])->saveQuietly();
+        });
+    }
+
+    public static function makeBatchNumber(int $id): string
+    {
+        return 'BATCH-'.str_pad((string) $id, 6, '0', STR_PAD_LEFT);
+    }
 
     protected function casts(): array
     {

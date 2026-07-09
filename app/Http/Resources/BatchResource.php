@@ -20,6 +20,7 @@ class BatchResource extends JsonResource
 
         return [
             'id'           => $this->id,
+            'batch_number' => $this->batch_number,
             'supplier_id'  => $this->supplier_id,
             'supplier'     => new SupplierMiniResource($this->whenLoaded('supplier')),
             'purchase_date' => $this->purchase_date?->format('Y-m-d'),

@@ -96,9 +96,11 @@ class BatchImportTest extends TestCase
         $this->assertEquals(1, $response->json('data.created'));
         $this->assertEquals(0, $response->json('data.skipped'));
         $this->assertCount(0, $response->json('data.errors'));
+        $this->assertNotNull($response->json('data.batch.batch_number'));
 
         $this->assertDatabaseHas('batches', [
             'supplier_id' => $this->supplier->id,
+            'batch_number' => $response->json('data.batch.batch_number'),
             'total_cost_foreign' => 15000.00,
             'notes' => 'Import test notes',
             'cars_count' => 1,
@@ -199,6 +201,7 @@ class BatchImportTest extends TestCase
         ]);
 
         $this->assertEquals(Batch::STATUS_PARTIAL, $batch->status);
+        $this->assertEquals(Batch::makeBatchNumber($batch->id), $batch->batch_number);
 
         $response1 = $this->postJson('/api/supplier-payments', [
             'supplier_id' => $this->supplier->id,
