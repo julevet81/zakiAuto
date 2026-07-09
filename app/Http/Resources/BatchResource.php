@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -46,7 +47,8 @@ class BatchResource extends JsonResource
             // not set. NOT user-editable.
             'exchange_rate' => $this->exchange_rate !== null
                 ? (float) $this->exchange_rate
-                : null,
+                : Setting::where('key', 'current_exchange_rate')
+                ->value('value'),
 
             'status'     => $this->status,
             'cars_count' => $this->cars_count ?? $this->whenLoaded(
