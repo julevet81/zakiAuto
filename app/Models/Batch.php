@@ -49,16 +49,16 @@ class Batch extends Model
 
     public static function makeBatchNumber(int $id): string
     {
-        return 'BATCH-'.str_pad((string) $id, 6, '0', STR_PAD_LEFT);
+        return 'BATCH-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
     }
 
     protected function casts(): array
     {
         return [
-            'purchase_date'              => 'date',
-            'total_cost_foreign'         => 'decimal:2',
-            'total_paid_amount_foreign'  => 'decimal:2',
-            'exchange_rate'              => 'decimal:4',
+            'purchase_date' => 'date',
+            'total_cost_foreign' => 'decimal:2',
+            'total_paid_amount_foreign' => 'decimal:2',
+            'exchange_rate' => 'decimal:4',
         ];
     }
 
@@ -161,39 +161,41 @@ class Batch extends Model
             ')
             ->first();
 
-        $paymentCount   = (int)   ($aggregate->payment_count ?? 0);
-        $totalForeign   = (float) ($aggregate->total_foreign  ?? 0);
-        $weightedSum    = (float) ($aggregate->weighted_sum   ?? 0);
-        $maxRate        = (float) ($aggregate->max_rate       ?? 0);
-        $totalCost      = (float) ($this->total_cost_foreign  ?? 0);
+        $paymentCount = (int) ($aggregate->payment_count ?? 0);
+        $totalForeign = (float) ($aggregate->total_foreign ?? 0);
+        $weightedSum = (float) ($aggregate->weighted_sum ?? 0);
+        $maxRate = (float) ($aggregate->max_rate ?? 0);
+        $totalCost = (float) ($this->total_cost_foreign ?? 0);
 
         if ($paymentCount === 0 || $totalCost <= 0) {
-            // No payments recorded yet, or no target cost set — we use the
-            // latest payment's exchange rate as a fallback.
-            $this->exchange_rate = $this->payments()->latest('id')->value('exchange_rate');
-        } else {
-            $remainingForeign = max($totalCost - $totalForeign, 0.0);
+            if ($paymentCount === 0) {
+                // لا توجد دفعات، نجلب سعر الصرف الحالي من الإعدادات
+                $this->exchange_rate = Setting::where('key', 'current_exchange_rate')
+                    ->value('value');
+            } else {
+                $remainingForeign = max($totalCost - $totalForeign, 0.0);
 
-            // Weighted sum for the already-paid portion is $weightedSum.
-            // Add the unpaid portion priced at the worst (highest) rate.
-            $blendedWeightedSum = $weightedSum + ($remainingForeign * $maxRate);
+                // Weighted sum for the already-paid portion is $weightedSum.
+                // Add the unpaid portion priced at the worst (highest) rate.
+                $blendedWeightedSum = $weightedSum + ($remainingForeign * $maxRate);
 
-            // Divide by the total cost to get the blended effective rate.
-            $this->exchange_rate = round($blendedWeightedSum / $totalCost, 4);
-        }
+                // Divide by the total cost to get the blended effective rate.
+                $this->exchange_rate = round($blendedWeightedSum / $totalCost, 4);
+            }
 
-        // Always keep total_paid_amount_foreign in sync at the same time,
-        // since we already fetched the aggregate — no extra query needed.
-        $this->total_paid_amount_foreign = $totalForeign;
+            // Always keep total_paid_amount_foreign in sync at the same time,
+            // since we already fetched the aggregate — no extra query needed.
+            $this->total_paid_amount_foreign = $totalForeign;
 
-        if ($totalCost > 0 && $this->total_paid_amount_foreign >= $totalCost) {
-            $this->status = self::STATUS_FULLY_PAID;
-        } else {
-            $this->status = self::STATUS_PARTIAL;
-        }
+            if ($totalCost > 0 && $this->total_paid_amount_foreign >= $totalCost) {
+                $this->status = self::STATUS_FULLY_PAID;
+            } else {
+                $this->status = self::STATUS_PARTIAL;
+            }
 
-        if ($save) {
-            $this->save();
+            if ($save) {
+                $this->save();
+            }
         }
     }
 }
