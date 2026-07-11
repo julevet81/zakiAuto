@@ -118,7 +118,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('car_id')->constrained('cars')->onDelete('cascade');
             $table->string('expense_type', 100); // Replacing raw enum with varchar for flexibility
-            $table->decimal('foreign_amount', 15, 2);
+            $table->decimal('foreign_amount', 15, 2)->nullable();
             $table->decimal('local_amount', 15, 2);
             $table->text('notes')->nullable();
             $table->timestamps();

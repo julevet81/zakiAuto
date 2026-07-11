@@ -157,6 +157,20 @@ class Car extends Model
             + (float) $this->generalExpenses()->sum('amount');
     }
 
+    public function getTotalCostLocalAttribute(): float
+    {
+        $exchangeRate = (float) ($this->batch?->exchange_rate ?? Setting::where('key', 'current_exchange_rate')->value('value'));
+        // (سعر الشراء + سعر الشحن) بالعملة الأجنبية × سعر الصرف
+        // = تكلفة السيارة واصلة إلى الميناء، بالعملة المحلية
+        return ((float) $this->foreign_purchase_price + (float) $this->shipping_cost) * $exchangeRate;
+    }
+
+    public function getProfitAttribute(): float
+    {
+        // سعر البيع في الميناء (محلي) - تكلفة الوصول للميناء (محلي) = الفائدة (محلي)
+        return (float) $this->sale_price - $this->total_cost_local;
+    }
+
     /**
      * Net profit estimate: sale price minus purchase price minus expenses.
      * This is a simple estimate for dashboards; real profit accounting
@@ -164,9 +178,7 @@ class Car extends Model
      */
     public function getEstimatedProfitAttribute(): float
     {
-        $exchangeRate = (float) ($this->batch?->exchange_rate ?? 1.0);
-        $costLocal = ((float) $this->foreign_purchase_price + (float) $this->shipping_cost) * $exchangeRate;
-        return (float) $this->sale_price - $costLocal;
+        return $this->profit;
     }
 
     public function isSold(): bool

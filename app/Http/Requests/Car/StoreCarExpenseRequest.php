@@ -18,7 +18,7 @@ class StoreCarExpenseRequest extends FormRequest
     {
         return [
             'expense_type' => ['required', 'string', 'max:100'],
-            'foreign_amount' => ['required', 'numeric', 'min:0'],
+            'foreign_amount' => ['nullable', 'numeric', 'min:0'],
             'local_amount' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ];
