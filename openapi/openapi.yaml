@@ -592,6 +592,78 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /auth/update-password:
+    post:
+      tags: [Auth]
+      summary: تعديل كلمة مرور المستخدم الحالي
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, password, password_confirmation]
+              properties:
+                current_password:
+                  type: string
+                  example: "12345678"
+                password:
+                  type: string
+                  minLength: 8
+                  example: newpassword123
+                password_confirmation:
+                  type: string
+                  example: newpassword123
+      responses:
+        '200':
+          description: تم تحديث كلمة المرور بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    put:
+      tags: [Auth]
+      summary: تعديل كلمة مرور المستخدم الحالي
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, password, password_confirmation]
+              properties:
+                current_password:
+                  type: string
+                  example: "12345678"
+                password:
+                  type: string
+                  minLength: 8
+                  example: newpassword123
+                password_confirmation:
+                  type: string
+                  example: newpassword123
+      responses:
+        '200':
+          description: تم تحديث كلمة المرور بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /ping:
     get:
       tags: [Auth]

@@ -21,7 +21,7 @@ return new class extends Migration
                 ->onDelete('cascade');
             $table->string('title', 150);
             $table->string('file_path', 255);
-            $table->string('file_type', 50)->nullable(); // mime type
+            $table->string('file_type', 255)->nullable(); // mime type
             $table->string('file_size')->nullable();     // human-readable e.g. "2.3 MB"
             $table->foreignId('uploaded_by')
                 ->constrained('users')
