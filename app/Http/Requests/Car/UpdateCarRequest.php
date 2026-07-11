@@ -34,6 +34,7 @@ class UpdateCarRequest extends FormRequest
             ],
 
             'foreign_purchase_price' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'shipping_cost' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'sale_price' => ['sometimes', 'required', 'numeric', 'min:0'],
 
             'tracking_number' => ['nullable', 'string', 'max:255'],

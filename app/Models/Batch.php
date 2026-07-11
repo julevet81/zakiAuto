@@ -173,29 +173,31 @@ class Batch extends Model
                 $this->exchange_rate = Setting::where('key', 'current_exchange_rate')
                     ->value('value');
             } else {
-                $remainingForeign = max($totalCost - $totalForeign, 0.0);
-
-                // Weighted sum for the already-paid portion is $weightedSum.
-                // Add the unpaid portion priced at the worst (highest) rate.
-                $blendedWeightedSum = $weightedSum + ($remainingForeign * $maxRate);
-
-                // Divide by the total cost to get the blended effective rate.
-                $this->exchange_rate = round($blendedWeightedSum / $totalCost, 4);
+                $this->exchange_rate = $this->payments()->latest('id')->value('exchange_rate');
             }
+        } else {
+            $remainingForeign = max($totalCost - $totalForeign, 0.0);
 
-            // Always keep total_paid_amount_foreign in sync at the same time,
-            // since we already fetched the aggregate — no extra query needed.
-            $this->total_paid_amount_foreign = $totalForeign;
+            // Weighted sum for the already-paid portion is $weightedSum.
+            // Add the unpaid portion priced at the worst (highest) rate.
+            $blendedWeightedSum = $weightedSum + ($remainingForeign * $maxRate);
 
-            if ($totalCost > 0 && $this->total_paid_amount_foreign >= $totalCost) {
-                $this->status = self::STATUS_FULLY_PAID;
-            } else {
-                $this->status = self::STATUS_PARTIAL;
-            }
+            // Divide by the total cost to get the blended effective rate.
+            $this->exchange_rate = round($blendedWeightedSum / $totalCost, 4);
+        }
 
-            if ($save) {
-                $this->save();
-            }
+        // Always keep total_paid_amount_foreign in sync at the same time,
+        // since we already fetched the aggregate — no extra query needed.
+        $this->total_paid_amount_foreign = $totalForeign;
+
+        if ($totalCost > 0 && $this->total_paid_amount_foreign >= $totalCost) {
+            $this->status = self::STATUS_FULLY_PAID;
+        } else {
+            $this->status = self::STATUS_PARTIAL;
+        }
+
+        if ($save) {
+            $this->save();
         }
     }
 }

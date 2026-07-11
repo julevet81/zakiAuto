@@ -41,7 +41,7 @@ class InvoiceController extends Controller
     {
         $order = Order::with('car')->find($request->validated('order_id'));
 
-        $totalAmount = (float) $order->car->sale_price;
+        $totalAmount = (float) $order->car->sale_price + (float) $order->car->total_expenses;
         $paidAmount = (float) $order->paid_amount;
         $remaining = max($totalAmount - $paidAmount, 0);
 

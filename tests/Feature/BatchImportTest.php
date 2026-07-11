@@ -110,11 +110,7 @@ class BatchImportTest extends TestCase
         $this->assertNotNull($car);
         $this->assertEquals($this->containerOpener->id, $car->container_opener_id);
 
-        $this->assertDatabaseHas('car_expenses', [
-            'car_id' => $car->id,
-            'expense_type' => 'شحن',
-            'local_amount' => 1500.00,
-        ]);
+        $this->assertEquals(1500.00, (float) $car->shipping_cost);
 
         $this->assertDatabaseHas('customers', [
             'name' => 'Ahmad Zaki',

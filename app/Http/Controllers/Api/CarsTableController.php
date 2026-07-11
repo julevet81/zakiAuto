@@ -90,12 +90,6 @@ class CarsTableController extends Controller
     {
         return Car::query()
             ->with(['order.customer', 'firstOrder.customer', 'currentOrder.customer'])
-            ->withSum(['expenses as shipping_price_sum' => function ($q) {
-                $q->where(function ($q) {
-                    $q->where('expense_type', 'like', '%شحن%')
-                        ->orWhere('expense_type', 'like', '%shipping%');
-                });
-            }], 'local_amount')
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('brand'), fn ($q) => $q->where('brand', 'like', '%'.$request->string('brand').'%'))
             ->when($request->filled('batch_id'), fn ($q) => $q->where('batch_id', $request->integer('batch_id')))
@@ -152,7 +146,7 @@ class CarsTableController extends Controller
             'current_owner_name' => $currentCustomer?->name,
             'current_owner_passport_no' => $currentCustomer?->passport_no,
             'current_owner_national_id' => $currentCustomer?->national_id,
-            'shipping_price' => (float) ($car->shipping_price_sum ?? 0),
+            'shipping_price' => (float) $car->shipping_cost,
             'arrival_date' => $car->arrival_date?->format('Y-m-d'),
         ];
     }

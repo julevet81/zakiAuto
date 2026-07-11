@@ -98,11 +98,7 @@ class CarsTableExport implements FromQuery, WithHeadings, WithMapping, WithStyle
             $currentCustomer?->name,
             $currentCustomer?->passport_no,
             $currentCustomer?->national_id,
-            // shipping_price_sum is pre-aggregated by the withSum() clause
-            // on the query passed in from CarsTableController::buildQuery()
-            // — NOT Car::getShippingPriceAttribute(), which would re-run a
-            // separate query per row (N+1) across a potentially large export.
-            (float) ($car->shipping_price_sum ?? 0),
+            (float) $car->shipping_cost,
             $car->arrival_date?->format('Y-m-d'),
         ];
     }

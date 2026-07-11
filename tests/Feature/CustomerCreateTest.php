@@ -28,6 +28,7 @@ class CustomerCreateTest extends TestCase
             'phone' => '0547896541',
             'email' => 'omar@zaki.com',
             'national_id' => '2514789632541785',
+            'passport_no' => 'P98765432',
             'agent_id' => 2,
         ]);
 

@@ -56,6 +56,7 @@ class CarResource extends JsonResource
             // operational visibility — an admin can see the supplier this
             // car came from (operational) but never this figure (cost).
             'foreign_purchase_price' => $this->when($canSeeCosts, (float) $this->foreign_purchase_price),
+            'shipping_cost' => $this->when($canSeeCosts, (float) $this->shipping_cost),
             'sale_price' => (float) $this->sale_price,
 
             'tracking_number' => $this->tracking_number,
@@ -74,7 +75,7 @@ class CarResource extends JsonResource
                 fn() => $this->total_expenses
             ),
             'estimated_profit' => $this->when(
-                $canSeeCosts && $this->relationLoaded('expenses') && $this->relationLoaded('generalExpenses'),
+                $canSeeCosts,
                 fn() => $this->estimated_profit
             ),
 

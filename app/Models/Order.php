@@ -120,7 +120,7 @@ class Order extends Model
     public function recalculateBalance(): void
     {
         $paid = (float) $this->payments()->sum('amount');
-        $price = (float) $this->car?->sale_price;
+        $price = (float) $this->car?->sale_price + (float) ($this->car?->total_expenses ?? 0);
 
         $this->forceFill([
             'paid_amount' => $paid,

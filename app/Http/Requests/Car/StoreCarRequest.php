@@ -31,6 +31,7 @@ class StoreCarRequest extends FormRequest
             'vin' => ['nullable', 'string', 'max:50', Rule::unique('cars', 'vin')],
 
             'foreign_purchase_price' => ['required', 'numeric', 'min:0'],
+            'shipping_cost' => ['nullable', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0'],
 
             'tracking_number' => ['nullable', 'string', 'max:255'],

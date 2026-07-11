@@ -83,7 +83,7 @@ class OrderController extends Controller
                 'created_by' => Auth::id(),
             ]);
 
-            $order->remaining_amount = (float) $car->sale_price;
+            $order->remaining_amount = (float) $car->sale_price + (float) $car->total_expenses;
             $order->save();
 
             $car->update([

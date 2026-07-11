@@ -37,6 +37,7 @@ class Car extends Model
         'color',
         'vin',
         'foreign_purchase_price',
+        'shipping_cost',
         'sale_price',
         'tracking_number',
         'container_no',
@@ -52,6 +53,7 @@ class Car extends Model
         return [
             'manufacture_year' => 'integer',
             'foreign_purchase_price' => 'decimal:2',
+            'shipping_cost' => 'decimal:2',
             'sale_price' => 'decimal:2',
             'shipping_date' => 'date',
             'arrival_date' => 'date',
@@ -143,12 +145,7 @@ class Car extends Model
      */
     public function getShippingPriceAttribute(): float
     {
-        return (float) $this->expenses()
-            ->where(function ($q) {
-                $q->where('expense_type', 'like', '%شحن%')
-                    ->orWhere('expense_type', 'like', '%shipping%');
-            })
-            ->sum('local_amount');
+        return (float) $this->shipping_cost;
     }
 
     /**
@@ -167,9 +164,9 @@ class Car extends Model
      */
     public function getEstimatedProfitAttribute(): float
     {
-        return (float) $this->sale_price
-            - (float) $this->foreign_purchase_price
-            - $this->total_expenses;
+        $exchangeRate = (float) ($this->batch?->exchange_rate ?? 1.0);
+        $costLocal = ((float) $this->foreign_purchase_price + (float) $this->shipping_cost) * $exchangeRate;
+        return (float) $this->sale_price - $costLocal;
     }
 
     public function isSold(): bool
