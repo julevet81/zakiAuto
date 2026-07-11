@@ -554,6 +554,44 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthenticated'
 
+  /auth/update-profile:
+    put:
+      tags: [Auth]
+      summary: تعديل بيانات الملف الشخصي للمستخدم
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: أحمد محمد
+                email:
+                  type: string
+                  format: email
+                  example: ahmed@example.com
+                phone:
+                  type: string
+                  example: 0555555555
+      responses:
+        '200':
+          description: تم تحديث بيانات الملف الشخصي بنجاح
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
   /ping:
     get:
       tags: [Auth]

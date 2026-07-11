@@ -48,6 +48,7 @@ Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
         Route::post('update-password', [AuthController::class, 'updatePassword']);
+        Route::put('update-profile', [AuthController::class, 'updateProfile']);
     });
 });
 

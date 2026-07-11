@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\UpdatePasswordRequest;
+use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\UserResource;
 use App\Models\Customer;
@@ -109,6 +110,21 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث كلمة المرور بنجاح.',
+        ]);
+    }
+
+    /**
+     * Update the authenticated user's profile information.
+     */
+    public function updateProfile(UpdateProfileRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $user->update($request->validated());
+
+        return response()->json([
+            'message' => 'تم تحديث بيانات الملف الشخصي بنجاح.',
+            'user' => new UserResource($user->load('roles')),
         ]);
     }
 

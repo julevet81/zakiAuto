@@ -120,8 +120,8 @@ class BatchCarsImportService
         $purchasePrice = $row->get(self::COL_PURCHASE_PRICE);
         $trackingNumber = $this->nullableString($row->get(self::COL_TRACKING_NUMBER));
         $customerName = trim((string) $row->get(self::COL_CUSTOMER_NAME));
-        $passportNo = $this->nullableString($row->get(self::COL_PASSPORT_NO));
-        $nationalId = $this->nullableString($row->get(self::COL_NATIONAL_ID));
+        $passportNo = $row->get(self::COL_PASSPORT_NO);
+        $nationalId = $row->get(self::COL_NATIONAL_ID);
         $shippingCost = $row->get(self::COL_SHIPPING_COST);
         $arrivalDateRaw = $row->get(self::COL_ARRIVAL_DATE);
 
@@ -139,6 +139,12 @@ class BatchCarsImportService
         }
         if ($vin !== null && Car::where('vin', $vin)->exists()) {
             throw new \RuntimeException("رقم الهيكل (VIN) مكرر: {$vin}");
+        }
+        if ($passportNo === '' ) {
+            throw new \RuntimeException('يجب إدخال رقم جواز السفر للعميل');
+        }
+        if ($nationalId === '' ) {
+            throw new \RuntimeException('يجب إدخال رقم الهوية الوطنية للعميل');
         }
 
         $arrivalDate = $this->parseDate($arrivalDateRaw);
