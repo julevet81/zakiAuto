@@ -2,10 +2,8 @@
 
 namespace App\Http\Resources;
 
-use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * @mixin \App\Models\Car
@@ -59,10 +57,10 @@ class CarResource extends JsonResource
             // car came from (operational) but never this figure (cost).
             'foreign_purchase_price' => $this->when($canSeeCosts, (float) $this->foreign_purchase_price),
             'shipping_cost' => $this->when($canSeeCosts, (float) $this->shipping_cost),
-            'exchange_rate' => $this->when($canSeeCosts && $this->relationLoaded('batch'), fn() => $this->batch?->exchange_rate !== null
-                ? (float) $this->batch->exchange_rate
-                :  Setting::where('key', 'current_exchange_rate')
-                    ->value('value')),
+            'exchange_rate' => $this->when($canSeeCosts, (float) ($this->batch?->exchange_rate ?? 1.0)),
+            'total_cost_local' => $this->when($canSeeCosts, (float) $this->total_cost_local),
+            'profit' => $this->when($canSeeCosts, (float) $this->profit),
+            'profit_percentage' => $this->when($canSeeCosts, $this->profit_percentage),
             'sale_price' => (float) $this->sale_price,
 
             'tracking_number' => $this->tracking_number,
@@ -81,8 +79,8 @@ class CarResource extends JsonResource
                 fn() => $this->total_expenses
             ),
             'estimated_profit' => $this->when(
-                Auth::user()?->hasRole('super_admin'),
-                $this->estimated_profit
+                $canSeeCosts,
+                fn() => $this->estimated_profit
             ),
 
             'is_sold' => $this->isSold(),
