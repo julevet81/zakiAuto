@@ -85,7 +85,7 @@ class CustomerPaymentController extends Controller
                 'order_id' => $request->validated('order_id'),
                 'customer_id' => $request->validated('customer_id'),
                 'amount' => $request->validated('amount'),
-                'received_by' => $request->validated('received_by'),
+                'received_by' => $request->user()->id,
                 'agent_id' => $request->validated('agent_id'),
                 'attachment' => $request->validated('attachment'),
                 'payment_date' => $request->validated('payment_date'),

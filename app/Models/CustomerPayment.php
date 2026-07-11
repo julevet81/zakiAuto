@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class CustomerPayment extends Model
 {
@@ -30,6 +31,16 @@ class CustomerPayment extends Model
             'amount' => 'decimal:2',
             'payment_date' => 'date',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $payment) {
+            if (Auth::check()) {
+                $payment->received_by = $payment->received_by ?: Auth::user()->id;
+                $payment->created_by = $payment->created_by ?: Auth::user()->id;
+            }
+        });
     }
 
     public function order(): BelongsTo
@@ -66,8 +77,13 @@ class CustomerPayment extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function receiver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
+    }
+
     public function wasCollectedByAgent(): bool
     {
-        return $this->received_by === 'agent';
+        return $this->agent_id !== null;
     }
 }

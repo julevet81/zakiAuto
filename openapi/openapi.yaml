@@ -344,8 +344,8 @@ components:
         amount:
           type: number
         received_by:
-          type: string
-          enum: [company, agent]
+          type: integer
+          description: ID of the system user who received/recorded this payment
         agent_id:
           type: integer
           nullable: true
@@ -1939,16 +1939,18 @@ paths:
       tags: [CustomerPayments]
       summary: تسجيل دفعة عميل على طلب
       description: |
-        - received_by=company: تدخل خزينة الشركة مباشرة (treasury "in").
-        - received_by=agent: تُسجَّل كدَين على الوكيل (agent_transactions "out")
-          حتى يتم تحويلها فعليًا عبر POST /customer-payments/{id}/remit.
+        يتم تحديد مسار الدفعة المالي بناءً على وجود `agent_id`:
+        - في حال عدم تمرير وكيل (agent_id = null): تدخل خزينة الشركة مباشرة (treasury "in").
+        - في حال تمرير وكيل (agent_id): تُسجَّل كدَين على الوكيل (agent_transactions "out") حتى يتم تحويلها فعليًا عبر POST /customer-payments/{id}/remit.
+        
+        حقل `received_by` ينشأ تلقائيًا ويتم تعيينه إلى معرّف المستخدم الحالي للنظام.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [order_id, customer_id, amount, received_by, payment_date]
+              required: [order_id, customer_id, amount, payment_date]
               properties:
                 order_id:
                   type: integer
@@ -1956,12 +1958,9 @@ paths:
                   type: integer
                 amount:
                   type: number
-                received_by:
-                  type: string
-                  enum: [company, agent]
                 agent_id:
                   type: integer
-                  description: مطلوب إن كان received_by=agent
+                  description: مطلوب إن كان استلام الدفعة بواسطة وكيل
                 payment_date:
                   type: string
                   format: date

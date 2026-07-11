@@ -82,7 +82,7 @@ class CustomerPassportLookupResource extends JsonResource
                     // via an agent (useful for the customer to reconcile
                     // their own receipts), but do NOT expose the agent's
                     // identity or internal IDs.
-                    'received_by'  => $payment->received_by,
+                    'received_by'  => $payment->wasCollectedByAgent() ? 'agent' : 'company',
                     'notes'        => $payment->notes,
                 ]),
 

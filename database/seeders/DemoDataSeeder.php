@@ -448,7 +448,7 @@ class DemoDataSeeder extends Seeder
                     ['order_id' => $order->id, 'amount' => $amount, 'payment_date' => $date],
                     [
                         'customer_id' => $order->customer_id,
-                        'received_by' => $receivedBy,
+                        'received_by' => $this->admin->id,
                         'agent_id' => $agentId,
                         'attachment' => 'demo/payments/customer-'.$order->id.'-'.$amount.'.pdf',
                         'notes' => 'Demo customer payment.',
