@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ServiceProviderController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierPaymentController;
+use App\Http\Controllers\Api\TreasuryController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -158,6 +159,7 @@ Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
     // ثامنًا: لوحة الإحصائيات
     // ------------------------------------------------------------------
     Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('tresury/summary', [TreasuryController::class, 'index']);
 
     // ------------------------------------------------------------------
     // عاشرًا: إدارة المستخدمين والصلاحيات
