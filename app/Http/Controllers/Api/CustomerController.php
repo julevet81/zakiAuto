@@ -26,8 +26,15 @@ class CustomerController extends Controller
 
         $user = $request->user();
 
+        // Whoever can see orders (in whatever scope) can see how much of
+        // them is still unpaid — same permission gate CustomerResource
+        // already expects for its on-the-fly total_remaining calculation,
+        // so we simply pre-compute it here to avoid N+1 queries.
+        $canSeeRemaining = $user->can('orders.view') || $user->can('orders.view_assigned');
+
         $query = Customer::query()
             ->withCount('orders')
+            ->when($canSeeRemaining, fn($q) => $q->withSum('orders as total_remaining_sum', 'remaining_amount'))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
                 $q->where(function ($q) use ($term) {
