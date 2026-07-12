@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CustomerPayment\ApproveTreasuryTransferRequest;
 use App\Http\Requests\CustomerPayment\RemitCustomerPaymentRequest;
 use App\Http\Requests\CustomerPayment\StoreCustomerPaymentRequest;
 use App\Http\Resources\CustomerPaymentResource;
@@ -30,14 +31,14 @@ class CustomerPaymentController extends Controller
 
         $query = CustomerPayment::query()
             ->with(['customer', 'agent'])
-            ->when($request->filled('order_id'), fn ($q) => $q->where('order_id', $request->integer('order_id')))
-            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('payment_date', '<=', $request->date('date_to')));
+            ->when($request->filled('order_id'), fn($q) => $q->where('order_id', $request->integer('order_id')))
+            ->when($request->filled('date_from'), fn($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('payment_date', '<=', $request->date('date_to')));
 
         if ($user->can('customer_payments.view')) {
             $query
-                ->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', $request->integer('customer_id')))
-                ->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')))
+                ->when($request->filled('customer_id'), fn($q) => $q->where('customer_id', $request->integer('customer_id')))
+                ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')))
                 ->when($request->filled('is_remitted'), function ($q) use ($request) {
                     $request->boolean('is_remitted')
                         ? $q->whereNotNull('remittance_id')
@@ -214,13 +215,13 @@ class CustomerPaymentController extends Controller
                 'transaction_id' => null,
                 'transaction_date' => $date,
                 'attachment' => $request->input('attachment'),
-                'notes' => $request->input('notes', 'تحويل دفعة عميل رقم #'.$customerPayment->id.' للخزينة'),
+                'notes' => $request->input('notes', 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' للخزينة'),
                 'created_by' => $userId,
             ]);
 
             // 2) Treasury actually receives the cash now, referencing the
             //    agent_transactions row created above as its source.
-            $treasuryPrevious = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
+            $treasuryPrevious = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
             $treasuryNew = $treasuryPrevious + (float) $customerPayment->amount;
 
             $treasuryTransaction = TreasuryTransaction::create([
@@ -231,7 +232,8 @@ class CustomerPaymentController extends Controller
                 'source_type' => TreasuryTransaction::SOURCE_AGENT_REMITTANCE,
                 'source_id' => $agentTransaction->id,
                 'transaction_date' => $date,
-                'notes' => 'تحويل دفعة عميل من الوكيل: '.($customerPayment->agent?->name ?? $customerPayment->agent_id),
+                'status' => TreasuryTransaction::STATUS_APPROVED,
+                'notes' => 'تحويل دفعة عميل من الوكيل: ' . ($customerPayment->agent?->name ?? $customerPayment->agent_id),
                 'created_by' => $userId,
             ]);
 
@@ -249,12 +251,114 @@ class CustomerPaymentController extends Controller
     }
 
     /**
+     * Optional extra step: stage an already-received customer payment for
+     * transfer into the general treasury, pending management approval.
+     *
+     * Only makes sense for payments whose money has actually reached the
+     * (regular) treasury already:
+     *   - received_by=company payments post an "in" instantly at store().
+     *   - agent-collected payments only reach treasury once remitted.
+     * A still-unremitted agent-collected payment has no treasury entry
+     * yet to transfer, so it's rejected here.
+     *
+     * Creates a single "out" TreasuryTransaction with status=pending —
+     * it does NOT touch previous_balence/current_balence yet (those stay
+     * null), so it has zero effect on the real running balance until
+     * approveTreasuryTransfer() confirms it.
+     */
+    public function transferToTreasury(Request $request, CustomerPayment $customerPayment): JsonResponse
+    {
+        $this->authorize('view', $customerPayment);
+
+        if ($customerPayment->wasCollectedByAgent() && $customerPayment->remittance_id === null) {
+            return response()->json([
+                'message' => 'هذه الدفعة ما زالت لدى الوكيل ولم تُحوَّل للخزينة بعد، لا يمكن تحويلها للخزينة العامة',
+            ], 422);
+        }
+
+        $alreadyPending = TreasuryTransaction::query()
+            ->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
+            ->where('source_id', $customerPayment->id)
+            ->where('direction', TreasuryTransaction::DIRECTION_OUT)
+            ->where('status', TreasuryTransaction::STATUS_PENDING)
+            ->exists();
+
+        if ($alreadyPending) {
+            return response()->json([
+                'message' => 'هذه الدفعة قيد التحويل للخزينة العامة بالفعل، بانتظار اعتماد الإدارة',
+            ], 422);
+        }
+
+        $transfer = TreasuryTransaction::create([
+            'direction' => TreasuryTransaction::DIRECTION_OUT,
+            'amount' => $customerPayment->amount,
+            'previous_balence' => null,
+            'current_balence' => null,
+            'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
+            'source_id' => $customerPayment->id,
+            'transaction_date' => now()->toDateString(),
+            'status' => TreasuryTransaction::STATUS_PENDING,
+            'notes' => 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' إلى الخزينة العامة - بانتظار الاعتماد',
+            'created_by' => $request->user()->id,
+        ]);
+
+        return response()->json([
+            'message' => 'تم إرسال الدفعة للخزينة العامة، بانتظار اعتماد الإدارة',
+            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator'])),
+            'treasury_transfer_id' => $transfer->id,
+        ], 201);
+    }
+
+    /**
+     * Management approves a pending general-treasury transfer. This is
+     * the moment it actually posts against the real balance chain — the
+     * previous/current balance columns (left null since transferToTreasury())
+     * are computed now, against the latest APPROVED balance.
+     */
+    public function approveTreasuryTransfer(ApproveTreasuryTransferRequest $request, CustomerPayment $customerPayment): JsonResponse
+    {
+        $transfer = TreasuryTransaction::query()
+            ->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
+            ->where('source_id', $customerPayment->id)
+            ->where('direction', TreasuryTransaction::DIRECTION_OUT)
+            ->where('status', TreasuryTransaction::STATUS_PENDING)
+            ->latest('id')
+            ->first();
+
+        if (! $transfer) {
+            return response()->json([
+                'message' => 'لا يوجد تحويل معلّق لهذه الدفعة إلى الخزينة العامة',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($request, $transfer) {
+            $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
+            $newBalance = $previousBalance - (float) $transfer->amount;
+
+            $transfer->update([
+                'status' => TreasuryTransaction::STATUS_APPROVED,
+                'previous_balence' => $previousBalance,
+                'current_balence' => $newBalance,
+                'transaction_date' => $request->input('approval_date', now()->toDateString()),
+                'notes' => $request->input('notes', $transfer->notes),
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'message' => 'تم اعتماد تحويل الدفعة إلى الخزينة العامة بنجاح',
+            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator'])),
+        ]);
+    }
+
+    /**
      * Post the company-received "in" treasury movement for a
      * received_by=company payment.
      */
     protected function postTreasuryMovement(CustomerPayment $payment, int $userId): void
     {
-        $previousBalance = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
+        $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
         $newBalance = $previousBalance + (float) $payment->amount;
 
         TreasuryTransaction::create([
@@ -265,7 +369,8 @@ class CustomerPaymentController extends Controller
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $payment->id,
             'transaction_date' => $payment->payment_date,
-            'notes' => 'دفعة من العميل: '.($payment->customer?->name ?? $payment->customer_id),
+            'status' => TreasuryTransaction::STATUS_APPROVED,
+            'notes' => 'دفعة من العميل: ' . ($payment->customer?->name ?? $payment->customer_id),
             'created_by' => $userId,
         ]);
     }
@@ -291,7 +396,7 @@ class CustomerPaymentController extends Controller
             'current_balence' => $newBalance,
             'payment_id' => $payment->id,
             'transaction_date' => $payment->payment_date,
-            'notes' => 'قبض دفعة عميل رقم #'.$payment->id.' لم تُحوَّل للخزينة بعد',
+            'notes' => 'قبض دفعة عميل رقم #' . $payment->id . ' لم تُحوَّل للخزينة بعد',
             'created_by' => $userId,
         ]);
     }
@@ -302,7 +407,7 @@ class CustomerPaymentController extends Controller
      */
     protected function postTreasuryReversal(CustomerPayment $payment): void
     {
-        $previousBalance = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
+        $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
         $newBalance = $previousBalance - (float) $payment->amount;
 
         TreasuryTransaction::create([
@@ -313,7 +418,8 @@ class CustomerPaymentController extends Controller
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $payment->id,
             'transaction_date' => now()->toDateString(),
-            'notes' => 'إلغاء دفعة عميل محذوفة رقم #'.$payment->id,
+            'status' => TreasuryTransaction::STATUS_APPROVED,
+            'notes' => 'إلغاء دفعة عميل محذوفة رقم #' . $payment->id,
             'created_by' => $payment->created_by,
         ]);
     }
@@ -339,7 +445,7 @@ class CustomerPaymentController extends Controller
             'current_balence' => $newBalance,
             'payment_id' => $payment->id,
             'transaction_date' => now()->toDateString(),
-            'notes' => 'إلغاء قبض دفعة عميل محذوفة رقم #'.$payment->id,
+            'notes' => 'إلغاء قبض دفعة عميل محذوفة رقم #' . $payment->id,
             'created_by' => $payment->created_by,
         ]);
     }
