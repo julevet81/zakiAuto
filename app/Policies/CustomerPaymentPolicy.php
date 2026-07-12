@@ -25,8 +25,7 @@ class CustomerPaymentPolicy
         }
 
         if ($user->can('customer_payments.view_own')) {
-            return $user->customer?->id === $customerPayment->customer_id
-                || $user->agent?->id === $customerPayment->agent_id;
+            return $user->agent?->id === $customerPayment->agent_id;
         }
 
         return false;

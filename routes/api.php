@@ -142,8 +142,8 @@ Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
         ->parameters(['customer-payments' => 'customer_payment'])
         ->except(['update']); // financial records are corrected via void+recreate, not PUT/PATCH replace
     Route::post('customer-payments/{customer_payment}/remit', [CustomerPaymentController::class, 'remit']);
-    Route::post('customer-payments/{customerPayment}/transfer-to-treasury', [CustomerPaymentController::class, 'transferToTreasury']);
-    Route::post('customer-payments/{customerPayment}/approve-treasury-transfer', [CustomerPaymentController::class, 'approveTreasuryTransfer']);
+    Route::post('customer-payments/{customer_payment}/transfer-to-treasury', [CustomerPaymentController::class, 'transferToTreasury']);
+    Route::post('customer-payments/{customer_payment}/approve-treasury-transfer', [CustomerPaymentController::class, 'approveTreasuryTransfer']);
 
     Route::apiResource('agent-transactions', AgentTransactionController::class)
         ->parameters(['agent-transactions' => 'agent_transaction'])
