@@ -23,6 +23,22 @@ class User extends Authenticatable
     protected string $guard_name = 'api';
 
     /**
+     * Sync user updates with the linked agent profile if it exists.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (User $user) {
+            if ($user->agent) {
+                $user->agent->update([
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ]);
+            }
+        });
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>

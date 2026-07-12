@@ -146,4 +146,49 @@ class UserProfileTest extends TestCase
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['password']);
     }
+
+    public function test_authenticated_user_can_update_profile_using_post_method(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $response = $this->postJson('/api/auth/update-profile', [
+            'name' => 'Name Via Post',
+            'email' => 'postemail@zaki.com',
+            'phone' => '0511111111',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('user.name', 'Name Via Post')
+            ->assertJsonPath('user.email', 'postemail@zaki.com')
+            ->assertJsonPath('user.phone', '0511111111');
+
+        $this->user->refresh();
+        $this->assertEquals('Name Via Post', $this->user->name);
+    }
+
+    public function test_updating_user_profile_syncs_to_linked_agent_profile(): void
+    {
+        // Link an agent profile to this user
+        $agent = \App\Models\Agent::create([
+            'user_id' => $this->user->id,
+            'name' => $this->user->name,
+            'email' => $this->user->email,
+            'phone' => $this->user->phone,
+        ]);
+
+        Sanctum::actingAs($this->user);
+
+        $response = $this->postJson('/api/auth/update-profile', [
+            'name' => 'Agent New Name',
+            'email' => 'agentnew@zaki.com',
+            'phone' => '0522222222',
+        ]);
+
+        $response->assertOk();
+
+        $agent->refresh();
+        $this->assertEquals('Agent New Name', $agent->name);
+        $this->assertEquals('agentnew@zaki.com', $agent->email);
+        $this->assertEquals('0522222222', $agent->phone);
+    }
 }

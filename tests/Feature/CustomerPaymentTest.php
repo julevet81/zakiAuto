@@ -76,7 +76,7 @@ class CustomerPaymentTest extends TestCase
             'order_number' => 'ORD-TEST-01',
             'customer_id' => $this->customer->id,
             'car_id' => $this->car->id,
-            'status' => Order::STATUS_NEW,
+            'status' => Order::STATUS_SHIPPING,
         ]);
         
         $this->order->recalculateBalance();

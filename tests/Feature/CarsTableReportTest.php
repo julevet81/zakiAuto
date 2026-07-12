@@ -68,7 +68,7 @@ class CarsTableReportTest extends TestCase
             'order_number' => 'ORD-101',
             'customer_id' => $customer1->id,
             'car_id' => $car->id,
-            'status' => Order::STATUS_NEW,
+            'status' => Order::STATUS_SHIPPING,
         ]);
 
         $customer2 = Customer::create([

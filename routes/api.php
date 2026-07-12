@@ -49,7 +49,7 @@ Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
         Route::match(['post', 'put'], 'update-password', [AuthController::class, 'updatePassword']);
-        Route::put('update-profile', [AuthController::class, 'updateProfile']);
+        Route::match(['post', 'put'], 'update-profile', [AuthController::class, 'updateProfile']);
     });
 });
 

@@ -60,7 +60,7 @@ class CarOwnerDisplayTest extends TestCase
             'order_number' => 'ORD-001',
             'customer_id' => $customer1->id,
             'car_id' => $car->id,
-            'status' => Order::STATUS_NEW,
+            'status' => Order::STATUS_SHIPPING,
         ]);
 
         // 5. Create second customer (current owner)
@@ -151,7 +151,7 @@ class CarOwnerDisplayTest extends TestCase
             'order_number' => 'ORD-001',
             'customer_id' => $customer->id,
             'car_id' => $car->id,
-            'status' => Order::STATUS_NEW,
+            'status' => Order::STATUS_SHIPPING,
         ]);
 
         // Create an agent user (has no suppliers.view permission)

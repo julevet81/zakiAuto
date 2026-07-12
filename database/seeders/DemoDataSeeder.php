@@ -388,11 +388,10 @@ class DemoDataSeeder extends Seeder
     private function seedOrders(array $customers, array $agents, array $cars): array
     {
         $statuses = [
-            Order::STATUS_NEW,
-            Order::STATUS_PURCHASED,
+            Order::STATUS_AVAILABLE,
             Order::STATUS_SHIPPING,
-            Order::STATUS_ARRIVED_AT_PORT,
-            Order::STATUS_READY_FOR_DELIVERY,
+            Order::STATUS_IN_SHOW_ROOM,
+            Order::STATUS_SOLD,
             Order::STATUS_DELIVERED,
         ];
         $orderCars = array_slice($cars, 4, 6);

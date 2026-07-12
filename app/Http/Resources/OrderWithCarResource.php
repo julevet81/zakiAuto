@@ -58,12 +58,11 @@ class OrderWithCarResource extends JsonResource
     protected function statusLabel(): string
     {
         return match ($this->status) {
-            \App\Models\Order::STATUS_NEW               => 'طلب جديد',
-            \App\Models\Order::STATUS_PURCHASED         => 'تم الشراء',
-            \App\Models\Order::STATUS_SHIPPING          => 'قيد الشحن',
-            \App\Models\Order::STATUS_ARRIVED_AT_PORT   => 'وصل إلى الميناء',
-            \App\Models\Order::STATUS_READY_FOR_DELIVERY => 'جاهز للتسليم',
-            \App\Models\Order::STATUS_DELIVERED         => 'تم التسليم',
+            \App\Models\Order::STATUS_AVAILABLE => 'متوفر',
+            \App\Models\Order::STATUS_SHIPPING => 'قيد الشحن',
+            \App\Models\Order::STATUS_IN_SHOW_ROOM => 'وصل إلى صالة العرض',
+            \App\Models\Order::STATUS_SOLD => 'مباع',
+            \App\Models\Order::STATUS_DELIVERED => 'تم التسليم',
             default                                     => $this->status,
         };
     }
