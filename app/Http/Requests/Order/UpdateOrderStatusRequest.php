@@ -52,12 +52,12 @@ class UpdateOrderStatusRequest extends FormRequest
                 return;
             }
 
-            if ($newIndex !== $currentIndex + 1) {
-                $validator->errors()->add(
-                    'status',
-                    'لا يمكن تغيير الحالة من "'.$order->status.'" إلى "'.$newStatus.'" مباشرة، يجب اتباع تسلسل الحالات'
-                );
-            }
+            // if ($newIndex !== $currentIndex + 1) {
+            //     $validator->errors()->add(
+            //         'status',
+            //         'لا يمكن تغيير الحالة من "'.$order->status.'" إلى "'.$newStatus.'" مباشرة، يجب اتباع تسلسل الحالات'
+            //     );
+            // }
         });
     }
 }

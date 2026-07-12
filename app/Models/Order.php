@@ -13,31 +13,31 @@ class Order extends Model
     use HasFactory;
 
     /**
-     * Order lifecycle, exactly as specified in the requirements:
-     * new -> purchased -> shipping -> arrived_at_port -> ready_for_delivery -> delivered
+     * Order lifecycle. Deliberately identical, name-for-name, to Car's own
+     * STATUS_* constants: an order's status is not tracked independently
+     * — it is always a mirror of its car's status (see Car::booted()),
+     * updated automatically in both directions whenever the car's status
+     * changes. There is no separate order-status vocabulary anymore.
      */
-    public const STATUS_NEW = 'new';
+    public const STATUS_AVAILABLE = Car::STATUS_AVAILABLE;
 
-    public const STATUS_PURCHASED = 'purchased';
+    public const STATUS_SHIPPING = Car::STATUS_SHIPPING;
 
-    public const STATUS_SHIPPING = 'shipping';
+    public const STATUS_IN_SHOW_ROOM = Car::STATUS_IN_SHOW_ROOM;
 
-    public const STATUS_ARRIVED_AT_PORT = 'arrived_at_port';
+    public const STATUS_DELIVERED = Car::STATUS_DELIVERED;
 
-    public const STATUS_READY_FOR_DELIVERY = 'ready_for_delivery';
-
-    public const STATUS_DELIVERED = 'delivered';
+    public const STATUS_SOLD = Car::STATUS_SOLD;
 
     /**
      * Ordered list of valid statuses, used to validate forward transitions.
      */
     public const STATUSES = [
-        self::STATUS_NEW,
-        self::STATUS_PURCHASED,
+        self::STATUS_AVAILABLE,
         self::STATUS_SHIPPING,
-        self::STATUS_ARRIVED_AT_PORT,
-        self::STATUS_READY_FOR_DELIVERY,
+        self::STATUS_IN_SHOW_ROOM,
         self::STATUS_DELIVERED,
+        self::STATUS_SOLD,
     ];
 
     protected $fillable = [

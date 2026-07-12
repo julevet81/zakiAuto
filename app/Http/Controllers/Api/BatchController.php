@@ -4,14 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\BatchCarsImportFailedException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Batch\ImportBatchCarsRequest;
 use App\Http\Requests\Batch\StoreBatchRequest;
 use App\Http\Requests\Batch\UpdateBatchRequest;
-use App\Http\Requests\Batch\ImportBatchCarsRequest;
 use App\Http\Resources\BatchResource;
 use App\Models\Batch;
 use App\Services\BatchCarsImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class BatchController extends Controller
 {
@@ -99,7 +100,7 @@ class BatchController extends Controller
                 $request->user()->id
             );
         } catch (BatchCarsImportFailedException $e) {
-            \Illuminate\Support\Facades\Log::warning('Batch cars import failed: ' . $e->getMessage(), [
+            Log::warning('Batch cars import failed: ' . $e->getMessage(), [
                 'errors' => $e->errors(),
             ]);
 

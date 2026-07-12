@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Order;
 
 use App\Models\Car;
+use App\Models\Customer;
 use App\Models\Order;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -57,7 +58,7 @@ class StoreOrderRequest extends FormRequest
             $user = $this->user();
 
             if ($customerId && ! $user->can('customers.view') && $user->agent) {
-                $customer = \App\Models\Customer::find($customerId);
+                $customer = Customer::find($customerId);
 
                 if ($customer && $customer->agent_id !== $user->agent->id) {
                     $validator->errors()->add('customer_id', 'لا يمكنك إنشاء طلب لعميل غير تابع لك');

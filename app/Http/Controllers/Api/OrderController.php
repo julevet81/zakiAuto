@@ -31,12 +31,12 @@ class OrderController extends Controller
 
         $query = Order::query()
             ->with(['customer', 'car', 'agent'])
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')));
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')));
 
         if ($user->can('orders.view')) {
             $query
-                ->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', $request->integer('customer_id')))
-                ->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')));
+                ->when($request->filled('customer_id'), fn($q) => $q->where('customer_id', $request->integer('customer_id')))
+                ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
         } elseif ($user->can('orders.view_assigned')) {
             $query->where('agent_id', $user->agent?->id ?? 0);
         } elseif ($user->can('orders.view_own')) {
@@ -125,10 +125,10 @@ class OrderController extends Controller
     }
 
     /**
-     * Advance the order's status by exactly one step forward, per the
-     * workflow defined in Order::STATUSES. Also keeps the matching date
-     * column and the linked car's own status in sync, and marks the car
-     * `delivered` (terminal state) once the order itself is delivered.
+     * Advance the order's status by moving its CAR's status forward, per
+     * the workflow defined in Car::STATUSES (order statuses are no longer
+     * tracked independently — Car::booted() mirrors the new status onto
+     * this order automatically the moment the car is saved below).
      */
     public function changeStatus(UpdateOrderStatusRequest $request, Order $order): JsonResponse
     {
@@ -136,37 +136,29 @@ class OrderController extends Controller
             $newStatus = $request->validated('status');
             $date = $request->input('date', now()->toDateString());
 
+            $car = $order->car()->lockForUpdate()->first();
+
+            if (! $car) {
+                abort(422, 'لا توجد سيارة مرتبطة بهذا الطلب');
+            }
+
             $dateColumn = match ($newStatus) {
-                Order::STATUS_PURCHASED => 'purchase_date',
-                Order::STATUS_SHIPPING => 'shipping_date',
-                Order::STATUS_ARRIVED_AT_PORT => 'arrival_date',
-                Order::STATUS_DELIVERED => 'delivery_date',
+                Car::STATUS_SHIPPING => 'shipping_date',
+                Car::STATUS_IN_SHOW_ROOM => 'arrival_date',
+                Car::STATUS_DELIVERED => 'delivery_date',
                 default => null,
             };
 
-            $order->status = $newStatus;
+            $car->status = $newStatus;
             if ($dateColumn) {
-                $order->{$dateColumn} = $date;
+                $car->{$dateColumn} = $date;
             }
-            $order->save();
-
-            // Mirror the relevant car status so CarController's catalogue
-            // filtering (which excludes `sold`) stays accurate.
-            $carStatus = match ($newStatus) {
-                Order::STATUS_SHIPPING => Car::STATUS_SHIPPING,
-                Order::STATUS_ARRIVED_AT_PORT => Car::STATUS_ARRIVED,
-                Order::STATUS_DELIVERED => Car::STATUS_DELIVERED,
-                default => null,
-            };
-
-            if ($carStatus) {
-                $order->car?->update(['status' => $carStatus]);
-            }
+            $car->save(); // Car::booted() propagates $newStatus onto $order automatically.
         });
 
         return response()->json([
             'message' => 'تم تحديث حالة الطلب بنجاح',
-            'data' => new OrderResource($order->load(['customer', 'car', 'agent'])),
+            'data' => new OrderResource($order->fresh()->load(['customer', 'car', 'agent'])),
         ]);
     }
 
@@ -202,7 +194,7 @@ class OrderController extends Controller
     protected function generateOrderNumber(): string
     {
         do {
-            $candidate = 'ORD-'.now()->format('Y').'-'.Str::upper(Str::random(6));
+            $candidate = 'ORD-' . now()->format('Y') . '-' . Str::upper(Str::random(6));
         } while (Order::where('order_number', $candidate)->exists());
 
         return $candidate;

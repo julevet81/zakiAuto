@@ -160,7 +160,7 @@ class BatchCarsImportService
             'color' => $color,
             'vin' => $vin,
             'foreign_purchase_price' => (float) $purchasePrice,
-            'shipping_cost' => is_numeric($shippingCost) && (float) $shippingCost > 0 ? (float) $shippingCost : 0,
+            'shipping_cost' => (float) $shippingCost,
             'sale_price' => (float) $purchasePrice,
             'tracking_number' => $trackingNumber,
             'arrival_date' => $arrivalDate,

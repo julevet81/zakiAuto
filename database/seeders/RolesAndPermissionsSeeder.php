@@ -150,7 +150,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'customer_payments.create',
             'customer_payments.view_own',
             'cars.view',
-            'dashboard.view',
         ]);
 
         

@@ -13,6 +13,32 @@ class Car extends Model
     use HasFactory;
 
     /**
+     * The order's status is not maintained independently — it always
+     * mirrors its car's status, in both directions (advancing or
+     * reverting). Whenever a car's status changes, push that exact same
+     * value onto its current (most recent) order.
+     *
+     * Only the current order is synced, not the full order history: an
+     * older, already-completed order from a previous owner (before an
+     * ownership transfer) must not be rewritten by a later car status
+     * change that now belongs to a new order.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (Car $car) {
+            if (! $car->wasChanged('status')) {
+                return;
+            }
+
+            $order = $car->orders()->latest('id')->first();
+
+            if ($order && $order->status !== $car->status) {
+                $order->forceFill(['status' => $car->status])->saveQuietly();
+            }
+        });
+    }
+
+    /**
      * Lifecycle states for a car, mirroring the order lifecycle since a
      * car's own status tracks its journey from purchase to delivery.
      */
