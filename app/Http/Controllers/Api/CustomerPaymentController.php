@@ -47,8 +47,7 @@ class CustomerPaymentController extends Controller
             // Scoped to: payments made by this user's own customer record,
             // OR payments collected by this user's own agent record.
             $query->where(function ($q) use ($user) {
-                $q->where('customer_id', $user->customer?->id ?? 0)
-                    ->orWhere('agent_id', $user->agent?->id ?? 0);
+                $q->Where('agent_id', $user->agent?->id ?? 0);
             });
         }
 

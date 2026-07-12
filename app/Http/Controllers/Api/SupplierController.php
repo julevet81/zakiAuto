@@ -93,7 +93,7 @@ class SupplierController extends Controller
             ], 422);
         }
 
-        $supplier->delete();
+        $supplier->delete($supplier->id);
 
         return response()->json([
             'message' => 'تم حذف المورد بنجاح',
