@@ -21,6 +21,7 @@ class SupplierController extends Controller
 
         $query = Supplier::query()
             ->withCount(['batches', 'cars'])
+            ->with('batches') // SupplierResource computes total_remaining from this relation when loaded
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
                 $q->where(function ($q) use ($term) {
