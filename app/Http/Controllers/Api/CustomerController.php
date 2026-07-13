@@ -165,21 +165,48 @@ class CustomerController extends Controller
     {
         $this->authorize('update', $customer);
 
-        $request->validate([
-            'files'          => ['required', 'array', 'min:1', 'max:10'],
-            'files.*'        => ['required', 'file', 'max:10240'], // 10 MB per file
-            'titles'         => ['nullable', 'array'],
-            'titles.*'       => ['nullable', 'string', 'max:150'],
-        ]);
+        $files = $request->file('files');
+        if (empty($files)) {
+            return response()->json([
+                'message' => 'يجب إرسال ملفات للرفع.',
+                'errors' => ['files' => ['يجب إرسال ملفات للرفع.']]
+            ], 422);
+        }
+
+        $fileArray = is_array($files) ? $files : [$files];
+        $titles = $request->input('titles', []);
+        if (!is_array($titles)) {
+            $titles = [$titles];
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make(
+            [
+                'files' => $fileArray,
+                'titles' => $titles,
+            ],
+            [
+                'files'    => ['required', 'array'],
+                'files.*'  => ['required', 'file', 'max:10240'], // 10 MB per file
+                'titles'   => ['nullable', 'array'],
+                'titles.*' => ['nullable', 'string', 'max:150'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
         $uploaded = [];
 
-        foreach ($request->file('files') as $index => $file) {
+        foreach ($fileArray as $index => $file) {
             $path = $file->store("customer-documents/{$customer->id}", 'public');
 
             $doc = CustomerDocument::create([
                 'customer_id' => $customer->id,
-                'title'       => $request->input("titles.{$index}")
+                'title'       => data_get($titles, $index)
                     ?? pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
                 'file_path'   => $path,
                 'file_type'   => $file->getMimeType(),

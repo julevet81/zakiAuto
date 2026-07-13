@@ -20,7 +20,7 @@ class DocumentResource extends JsonResource
             'car_id' => $this->car_id,
             'title' => $this->title,
             'file_path' => $this->file_path,
-            'url' => $this->file_path ? \Illuminate\Support\Facades\Storage::url($this->file_path) : null,
+            'url' => $this->file_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path) : null,
             'created_at' => $this->created_at,
         ];
     }

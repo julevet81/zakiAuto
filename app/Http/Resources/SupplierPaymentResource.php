@@ -31,7 +31,7 @@ class SupplierPaymentResource extends JsonResource
             'amount_local' => (float) $this->amount_local,
 
             'attachment' => $this->attachment,
-            'attachment_url' => $this->attachment ? Storage::url($this->attachment) : null,
+            'attachment_url' => $this->attachment ? Storage::disk('public')->url($this->attachment) : null,
 
             'payment_date' => $this->payment_date?->format('Y-m-d'),
             'notes' => $this->notes,

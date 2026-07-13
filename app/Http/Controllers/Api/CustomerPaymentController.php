@@ -270,12 +270,7 @@ class CustomerPaymentController extends Controller
     {
         $this->authorize('view', $customerPayment);
 
-        if ($customerPayment->wasCollectedByAgent() && $customerPayment->remittance_id === null) {
-            return response()->json([
-                'message' => 'هذه الدفعة ما زالت لدى الوكيل ولم تُحوَّل للخزينة بعد، لا يمكن تحويلها للخزينة العامة',
-            ], 422);
-        }
-
+        // لا تسمح بإرسال نفس الدفعة أكثر من مرة
         $alreadyPending = TreasuryTransaction::query()
             ->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
             ->where('source_id', $customerPayment->id)
@@ -289,11 +284,15 @@ class CustomerPaymentController extends Controller
             ], 422);
         }
 
+        // إنشاء عملية معلقة دون التأثير على رصيد الخزينة
         $transfer = TreasuryTransaction::create([
             'direction' => TreasuryTransaction::DIRECTION_OUT,
             'amount' => $customerPayment->amount,
+
+            // سيتم تعبئتهما عند اعتماد العملية
             'previous_balence' => null,
             'current_balence' => null,
+
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $customerPayment->id,
             'transaction_date' => now()->toDateString(),
@@ -304,7 +303,9 @@ class CustomerPaymentController extends Controller
 
         return response()->json([
             'message' => 'تم إرسال الدفعة للخزينة العامة، بانتظار اعتماد الإدارة',
-            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator'])),
+            'data' => new CustomerPaymentResource(
+                $customerPayment->fresh(['customer', 'agent', 'creator'])
+            ),
             'treasury_transfer_id' => $transfer->id,
         ], 201);
     }
