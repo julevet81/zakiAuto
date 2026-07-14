@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Agent\RemitAgentBalanceRequest;
 use App\Http\Requests\CustomerPayment\ApproveTreasuryTransferRequest;
 use App\Http\Requests\CustomerPayment\RemitCustomerPaymentRequest;
 use App\Http\Requests\CustomerPayment\StoreCustomerPaymentRequest;
+use App\Http\Resources\AgentTransactionResource;
 use App\Http\Resources\CustomerPaymentResource;
 use App\Models\AgentTransaction;
 use App\Models\CustomerPayment;
@@ -169,84 +171,110 @@ class CustomerPaymentController extends Controller
      * (customer_payments.remittance_id <-> agent_transactions.transaction_id)
      * exactly as modelled in the migration.
      */
-    public function remit(RemitCustomerPaymentRequest $request, CustomerPayment $customerPayment): JsonResponse
+    public function remit(RemitAgentBalanceRequest $request,): JsonResponse
     {
-        if (! $customerPayment->wasCollectedByAgent()) {
+        $agent = $request->user()->agent; // موجود حتمًا هنا بفضل authorize()
+        $amount = (float) $request->input('amount');
+
+        $outstandingPayments = CustomerPayment::query()
+            ->where('agent_id', $agent->id)
+            ->where('received_by', $agent->user_id)
+            ->whereNull('remittance_id')
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get();
+
+        $availableBalance = (float) $outstandingPayments->sum('amount');
+
+        if ($availableBalance <= 0) {
             return response()->json([
-                'message' => 'هذه الدفعة لم تُستلم بواسطة وكيل، لا حاجة لتحويلها',
+                'message' => 'لا يوجد رصيد لديك بحاجة إلى تحويل',
             ], 422);
         }
 
-        if ($customerPayment->remittance_id !== null) {
+        if ($amount > $availableBalance) {
             return response()->json([
-                'message' => 'تم تحويل هذه الدفعة مسبقًا',
+                'message' => "المبلغ المُدخل ({$amount}) أكبر من رصيدك المتاح للتحويل ({$availableBalance})",
             ], 422);
         }
 
-        DB::transaction(function () use ($request, $customerPayment) {
+        $result = DB::transaction(function () use ($request, $agent, $amount, $outstandingPayments) {
             $date = $request->input('transaction_date', now()->toDateString());
             $userId = $request->user()->id;
 
-            // Order matters here: TreasuryTransaction::SOURCE_AGENT_REMITTANCE
-            // resolves source_id against the agent_transactions table (see
-            // TreasuryTransaction::source()), so the AgentTransaction row
-            // must exist BEFORE we create the TreasuryTransaction that
-            // references it. We create the agent ledger entry first with a
-            // temporary null transaction_id, then backfill it once the
-            // treasury entry exists (mirrors the "nullable column added
-            // first, constrained later" pattern already used by the
-            // migration itself for these same circular FKs).
-
-            // 1) The agent's "in" ledger entry: their debt to the company
-            //    for this specific amount is now cleared.
             $agentPrevious = (float) (AgentTransaction::query()
-                ->where('agent_id', $customerPayment->agent_id)
+                ->where('agent_id', $agent->id)
                 ->latest('id')
                 ->value('current_balence') ?? 0);
-            $agentNew = $agentPrevious + (float) $customerPayment->amount;
+            $agentNew = $agentPrevious + $amount;
 
             $agentTransaction = AgentTransaction::create([
-                'agent_id' => $customerPayment->agent_id,
+                'agent_id' => $agent->id,
                 'direction' => AgentTransaction::DIRECTION_IN,
-                'amount' => $customerPayment->amount,
+                'amount' => $amount,
                 'previous_balence' => $agentPrevious,
                 'current_balence' => $agentNew,
-                'payment_id' => $customerPayment->id,
+                'payment_id' => null,
                 'transaction_id' => null,
                 'transaction_date' => $date,
                 'attachment' => $request->input('attachment'),
-                'notes' => $request->input('notes', 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' للخزينة'),
+                'notes' => $request->input('notes', 'تحويل مبلغ من رصيد الوكيل للخزينة'),
                 'created_by' => $userId,
             ]);
 
-            // 2) Treasury actually receives the cash now, referencing the
-            //    agent_transactions row created above as its source.
             $treasuryPrevious = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
-            $treasuryNew = $treasuryPrevious + (float) $customerPayment->amount;
+            $treasuryNew = $treasuryPrevious + $amount;
 
             $treasuryTransaction = TreasuryTransaction::create([
                 'direction' => TreasuryTransaction::DIRECTION_IN,
-                'amount' => $customerPayment->amount,
+                'amount' => $amount,
                 'previous_balence' => $treasuryPrevious,
                 'current_balence' => $treasuryNew,
                 'source_type' => TreasuryTransaction::SOURCE_AGENT_REMITTANCE,
                 'source_id' => $agentTransaction->id,
                 'transaction_date' => $date,
                 'status' => TreasuryTransaction::STATUS_APPROVED,
-                'notes' => 'تحويل دفعة عميل من الوكيل: ' . ($customerPayment->agent?->name ?? $customerPayment->agent_id),
+                'notes' => 'تحويل رصيد من الوكيل: ' . $agent->name,
                 'created_by' => $userId,
             ]);
 
-            // 3) Backfill the agent ledger entry's transaction_id now that
-            //    the treasury entry exists, closing the circular reference.
             $agentTransaction->update(['transaction_id' => $treasuryTransaction->id]);
 
-            $customerPayment->update(['remittance_id' => $agentTransaction->id]);
+            $remaining = $amount;
+            $settledPayments = collect();
+
+            foreach ($outstandingPayments as $payment) {
+                if ((float) $payment->amount > $remaining + 0.0001) {
+                    break;
+                }
+
+                $payment->update(['remittance_id' => $agentTransaction->id]);
+                $settledPayments->push($payment);
+                $remaining -= (float) $payment->amount;
+            }
+
+            return [
+                'agent_transaction' => $agentTransaction->fresh(['agent', 'remittance']),
+                'settled_payments' => $settledPayments,
+                'unallocated_remainder' => round($remaining, 2),
+            ];
         });
 
+        $message = "تم تحويل {$amount} من رصيدك للخزينة بنجاح";
+        if ($result['settled_payments']->isNotEmpty()) {
+            $message .= ' وتمت تسوية ' . $result['settled_payments']->count() . ' دفعة/دفعات بالكامل';
+        }
+        if ($result['unallocated_remainder'] > 0) {
+            $message .= '، ويوجد مبلغ متبقٍ غير مخصص لدفعة معينة قدره ' . $result['unallocated_remainder'];
+        }
+
         return response()->json([
-            'message' => 'تم تأكيد تحويل الدفعة للخزينة بنجاح',
-            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'remittance'])),
+            'message' => $message,
+            'data' => [
+                'agent_transaction' => new AgentTransactionResource($result['agent_transaction']),
+                'settled_payments' => CustomerPaymentResource::collection($result['settled_payments']),
+                'unallocated_remainder' => $result['unallocated_remainder'],
+            ],
         ]);
     }
 
