@@ -319,14 +319,15 @@ class CustomerPaymentController extends Controller
             ], 422);
         }
 
+        $treasurytransaction = TreasuryTransaction::latest('id')->first();
         // إنشاء عملية معلقة دون التأثير على رصيد الخزينة
         $transfer = TreasuryTransaction::create([
             'direction' => TreasuryTransaction::DIRECTION_OUT,
             'amount' => $customerPayment->amount,
 
             // سيتم تعبئتهما عند اعتماد العملية
-            'previous_balence' => null,
-            'current_balence' => null,
+            'previous_balence' => $treasurytransaction?->current_balence,
+            'current_balence' => $treasurytransaction?->current_balence + $customerPayment->amount,
 
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $customerPayment->id,
