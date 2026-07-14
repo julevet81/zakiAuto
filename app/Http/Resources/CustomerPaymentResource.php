@@ -28,8 +28,7 @@ class CustomerPaymentResource extends JsonResource
             'agent_id' => $this->agent_id,
             'agent' => new AgentMiniResource($this->whenLoaded('agent')),
 
-            'remittance_id' => $this->remittance_id,
-            'is_remitted' => $this->remittance_id !== null,
+            'remittance_id' => $this->id,
 
             'attachment' => $this->attachment,
             'attachment_url' => $this->attachment ? Storage::disk('public')->url($this->attachment) : null,

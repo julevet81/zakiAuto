@@ -185,7 +185,6 @@ class CustomerPaymentController extends Controller
 
         $outstandingPayments = CustomerPayment::query()
             ->where('agent_id', $agent->id)
-            ->where('received_by', $agent->user_id)
             ->whereNull('remittance_id')
             ->orderBy('payment_date')
             ->orderBy('id')
@@ -326,8 +325,8 @@ class CustomerPaymentController extends Controller
             'amount' => $customerPayment->amount,
 
             // سيتم تعبئتهما عند اعتماد العملية
-            'previous_balence' => $treasurytransaction?->current_balence,
-            'current_balence' => $treasurytransaction?->current_balence + $customerPayment->amount,
+            'previous_balence' => $treasurytransaction?->previous_balence,
+            'current_balence' => $treasurytransaction?->current_balence,
 
             'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
             'source_id' => $customerPayment->id,
@@ -370,7 +369,7 @@ class CustomerPaymentController extends Controller
 
         DB::transaction(function () use ($request, $transfer) {
             $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
-            $newBalance = $previousBalance - (float) $transfer->amount;
+            $newBalance = $previousBalance + (float) $transfer->amount;
 
             $transfer->update([
                 'status' => TreasuryTransaction::STATUS_APPROVED,
