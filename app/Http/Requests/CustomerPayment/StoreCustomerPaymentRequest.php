@@ -82,9 +82,13 @@ class StoreCustomerPaymentRequest extends FormRequest
             }
 
             $user = $this->user();
-            if (! $user->can('customer_payments.view') && $user->agent) {
+            if ($user->agent) {
                 if ($order->agent_id !== $user->agent->id) {
                     $validator->errors()->add('order_id', 'لا يمكنك تسجيل دفعة على طلب غير مرتبط بك');
+                }
+
+                if ($this->has('agent_id') && (int)$this->input('agent_id') !== $user->agent->id) {
+                    $validator->errors()->add('agent_id', 'يجب أن تسجل الدفعة باسمك');
                 }
             }
         });

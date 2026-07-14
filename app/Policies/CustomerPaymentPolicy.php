@@ -20,6 +20,10 @@ class CustomerPaymentPolicy
      */
     public function view(User $user, CustomerPayment $customerPayment): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $customerPayment->agent_id;
+        }
+
         if ($user->can('customer_payments.view')) {
             return true;
         }

@@ -27,6 +27,10 @@ class OrderPolicy
      */
     public function view(User $user, Order $order): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $order->agent_id;
+        }
+
         if ($user->can('orders.view')) {
             return true;
         }
@@ -56,6 +60,9 @@ class OrderPolicy
      */
     public function update(User $user, Order $order): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $order->agent_id && $user->can('orders.update');
+        }
         return $user->can('orders.update');
     }
 
@@ -68,11 +75,17 @@ class OrderPolicy
      */
     public function changeStatus(User $user, Order $order): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $order->agent_id && $user->can('orders.change_status');
+        }
         return $user->can('orders.change_status');
     }
 
     public function delete(User $user, Order $order): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $order->agent_id && $user->can('orders.delete');
+        }
         return $user->can('orders.delete');
     }
 }

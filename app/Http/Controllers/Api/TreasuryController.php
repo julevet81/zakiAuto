@@ -16,17 +16,45 @@ class TreasuryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        Gate::authorize('treasury.view');
+        $user = $request->user();
+        if (! $user->agent) {
+            \Illuminate\Support\Facades\Gate::authorize('treasury.view');
+        }
 
-        $transactions = TreasuryTransaction::query()
+        $query = TreasuryTransaction::query()
             ->with('creator:id,name')
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
             ->when($request->filled('date_to'),   fn($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
-            ->when($request->filled('direction'), fn($q) => $q->where('direction', $request->string('direction')))
-            ->orderByDesc('id')
+            ->when($request->filled('direction'), fn($q) => $q->where('direction', $request->string('direction')));
+
+        if ($user->agent) {
+            $agentId = $user->agent->id;
+            $query->where(function ($q) use ($agentId) {
+                $q->where(function ($sq) use ($agentId) {
+                    $sq->where('source_type', TreasuryTransaction::SOURCE_AGENT_REMITTANCE)
+                        ->whereIn('source_id', function ($sub) use ($agentId) {
+                            $sub->select('id')
+                                ->from('agent_transactions')
+                                ->where('agent_id', $agentId);
+                        });
+                })
+                ->orWhere(function ($sq) use ($agentId) {
+                    $sq->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
+                        ->whereIn('source_id', function ($sub) use ($agentId) {
+                            $sub->select('id')
+                                ->from('customer_payments')
+                                ->where('agent_id', $agentId);
+                        });
+                });
+            });
+        }
+
+        $transactions = $query->orderByDesc('id')
             ->paginate($request->integer('per_page', 30));
 
-        $currentBalance = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
+        $currentBalance = $user->agent
+            ? (float) $user->agent->current_balance
+            : (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
 
         return response()->json([
             'current_balance' => $currentBalance,

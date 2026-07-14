@@ -31,38 +31,66 @@ class DashboardController extends Controller
         Gate::authorize('dashboard.view');
 
         $user = $request->user();
-        $canSeeProfit = $user->can('reports.view_profit');
 
-        $stats = [
-            'customers_count' => Customer::count(),
-            'suppliers_count' => Supplier::count(),
-            'cars_count' => Car::count(),
-            'orders_count' => Order::count(),
-            'agents_count' => Agent::count(),
+        if ($user->agent) {
+            $agentId = $user->agent->id;
+            $stats = [
+                'customers_count' => Customer::where('agent_id', $agentId)->count(),
+                'suppliers_count' => 0,
+                'cars_count' => Car::whereHas('order', fn($q) => $q->where('agent_id', $agentId))->count(),
+                'orders_count' => Order::where('agent_id', $agentId)->count(),
+                'agents_count' => 1,
 
-            'orders_by_status' => Order::query()
-                ->select('status', DB::raw('count(*) as count'))
-                ->groupBy('status')
-                ->pluck('count', 'status'),
+                'orders_by_status' => Order::query()
+                    ->where('agent_id', $agentId)
+                    ->select('status', DB::raw('count(*) as count'))
+                    ->groupBy('status')
+                    ->pluck('count', 'status'),
 
-            // Total sales = sum of sale_price for every car currently
-            // tied to an order (i.e. actually sold), not every car in
-            // inventory.
-            'total_sales' => (float) Car::query()
-                ->whereHas('order')
-                ->sum('sale_price'),
+                'total_sales' => (float) Car::query()
+                    ->whereHas('order', fn($q) => $q->where('agent_id', $agentId))
+                    ->sum('sale_price'),
 
-            'total_commissions' => (float) \App\Models\AgentTransaction::query()
-                ->where('direction', \App\Models\AgentTransaction::DIRECTION_OUT)
-                ->whereNull('payment_id') // exclude customer-payment-collection entries, keep manual commission entries
-                ->sum('amount'),
-        ];
+                'total_commissions' => (float) \App\Models\AgentTransaction::query()
+                    ->where('agent_id', $agentId)
+                    ->where('direction', \App\Models\AgentTransaction::DIRECTION_OUT)
+                    ->whereNull('payment_id')
+                    ->sum('amount'),
+            ];
+        } else {
+            $canSeeProfit = $user->can('reports.view_profit');
 
-        if ($canSeeProfit) {
-            $stats['total_purchase_cost'] = (float) Car::query()->whereHas('order')->sum('foreign_purchase_price');
-            $stats['total_expenses'] = (float) \App\Models\CarExpense::query()->sum('local_amount')
-                + (float) \App\Models\Expense::query()->sum('amount');
-            $stats['total_profit'] = $stats['total_sales'] - $stats['total_purchase_cost'] - $stats['total_expenses'];
+            $stats = [
+                'customers_count' => Customer::count(),
+                'suppliers_count' => Supplier::count(),
+                'cars_count' => Car::count(),
+                'orders_count' => Order::count(),
+                'agents_count' => Agent::count(),
+
+                'orders_by_status' => Order::query()
+                    ->select('status', DB::raw('count(*) as count'))
+                    ->groupBy('status')
+                    ->pluck('count', 'status'),
+
+                // Total sales = sum of sale_price for every car currently
+                // tied to an order (i.e. actually sold), not every car in
+                // inventory.
+                'total_sales' => (float) Car::query()
+                    ->whereHas('order')
+                    ->sum('sale_price'),
+
+                'total_commissions' => (float) \App\Models\AgentTransaction::query()
+                    ->where('direction', \App\Models\AgentTransaction::DIRECTION_OUT)
+                    ->whereNull('payment_id') // exclude customer-payment-collection entries, keep manual commission entries
+                    ->sum('amount'),
+            ];
+
+            if ($canSeeProfit) {
+                $stats['total_purchase_cost'] = (float) Car::query()->whereHas('order')->sum('foreign_purchase_price');
+                $stats['total_expenses'] = (float) \App\Models\CarExpense::query()->sum('local_amount')
+                    + (float) \App\Models\Expense::query()->sum('amount');
+                $stats['total_profit'] = $stats['total_sales'] - $stats['total_purchase_cost'] - $stats['total_expenses'];
+            }
         }
 
         return response()->json(['data' => $stats]);

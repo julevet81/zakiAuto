@@ -44,7 +44,9 @@ class CustomerController extends Controller
                 });
             });
 
-        if ($user->can('customers.view')) {
+        if ($user->agent) {
+            $query->where('agent_id', $user->agent->id);
+        } elseif ($user->can('customers.view')) {
             $query->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
         } elseif ($user->can('customers.view_assigned')) {
             $query->where('agent_id', $user->agent?->id ?? 0);
@@ -69,10 +71,10 @@ class CustomerController extends Controller
     public function store(StoreCustomerRequest $request): JsonResponse
     {
         $agentId = null;
-        if ($request->user()->can('customers.view')) {
-            $agentId = $request->validated('agent_id');
-        } elseif ($request->user()->agent) {
+        if ($request->user()->agent) {
             $agentId = $request->user()->agent->id;
+        } elseif ($request->user()->can('customers.view')) {
+            $agentId = $request->validated('agent_id');
         }
 
         $customer = Customer::create([

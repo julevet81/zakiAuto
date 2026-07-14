@@ -57,11 +57,15 @@ class StoreOrderRequest extends FormRequest
             $customerId = $this->input('customer_id');
             $user = $this->user();
 
-            if ($customerId && ! $user->can('customers.view') && $user->agent) {
+            if ($customerId && $user->agent) {
                 $customer = Customer::find($customerId);
 
                 if ($customer && $customer->agent_id !== $user->agent->id) {
                     $validator->errors()->add('customer_id', 'لا يمكنك إنشاء طلب لعميل غير تابع لك');
+                }
+
+                if ($this->has('agent_id') && (int)$this->input('agent_id') !== $user->agent->id) {
+                    $validator->errors()->add('agent_id', 'لا يمكنك إسناد الطلب لوكيل آخر');
                 }
             }
         });

@@ -19,6 +19,10 @@ class AgentTransactionPolicy
      */
     public function view(User $user, AgentTransaction $agentTransaction): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $agentTransaction->agent_id;
+        }
+
         if ($user->can('agent_transactions.view')) {
             return true;
         }

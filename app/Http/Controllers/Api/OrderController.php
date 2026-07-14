@@ -33,7 +33,9 @@ class OrderController extends Controller
             ->with(['customer', 'car', 'agent'])
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')));
 
-        if ($user->can('orders.view')) {
+        if ($user->agent) {
+            $query->where('agent_id', $user->agent->id);
+        } elseif ($user->can('orders.view')) {
             $query
                 ->when($request->filled('customer_id'), fn($q) => $q->where('customer_id', $request->integer('customer_id')))
                 ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
@@ -70,11 +72,13 @@ class OrderController extends Controller
             $isOwnershipTransfer = $firstOwnerCustomerId !== null
                 && (int) $firstOwnerCustomerId !== (int) $data['customer_id'];
 
+            $agentId = $request->user()->agent ? $request->user()->agent->id : ($data['agent_id'] ?? null);
+
             $order = Order::create([
                 'order_number' => $this->generateOrderNumber(),
                 'customer_id' => $data['customer_id'],
                 'car_id' => $data['car_id'],
-                'agent_id' => $data['agent_id'] ?? null,
+                'agent_id' => $agentId,
                 'status' => Order::STATUS_SHIPPING,
                 'purchase_date' => $data['purchase_date'] ?? null,
                 'shipping_date' => now()->toDateString(),

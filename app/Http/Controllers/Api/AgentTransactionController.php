@@ -27,7 +27,9 @@ class AgentTransactionController extends Controller
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')));
 
-        if ($user->can('agent_transactions.view')) {
+        if ($user->agent) {
+            $query->where('agent_id', $user->agent->id);
+        } elseif ($user->can('agent_transactions.view')) {
             $query->when($request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')));
         } else {
             $query->where('agent_id', $user->agent?->id ?? 0);

@@ -37,7 +37,9 @@ class CustomerPaymentController extends Controller
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
             ->when($request->filled('date_to'), fn($q) => $q->whereDate('payment_date', '<=', $request->date('date_to')));
 
-        if ($user->can('customer_payments.view')) {
+        if ($user->agent) {
+            $query->where('agent_id', $user->agent->id);
+        } elseif ($user->can('customer_payments.view')) {
             $query
                 ->when($request->filled('customer_id'), fn($q) => $q->where('customer_id', $request->integer('customer_id')))
                 ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')))
@@ -82,13 +84,18 @@ class CustomerPaymentController extends Controller
     public function store(StoreCustomerPaymentRequest $request): JsonResponse
     {
         $payment = DB::transaction(function () use ($request) {
+            $agentId = $request->validated('agent_id');
+            if ($request->user()->agent) {
+                $agentId = $request->user()->agent->id;
+            }
+
             /** @var CustomerPayment $payment */
             $payment = CustomerPayment::create([
                 'order_id' => $request->validated('order_id'),
                 'customer_id' => $request->validated('customer_id'),
                 'amount' => $request->validated('amount'),
                 'received_by' => $request->user()->id,
-                'agent_id' => $request->validated('agent_id'),
+                'agent_id' => $agentId,
                 'attachment' => $request->validated('attachment'),
                 'payment_date' => $request->validated('payment_date'),
                 'notes' => $request->validated('notes'),

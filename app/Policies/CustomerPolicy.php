@@ -26,6 +26,10 @@ class CustomerPolicy
      */
     public function view(User $user, Customer $customer): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $customer->agent_id;
+        }
+
         if ($user->can('customers.view')) {
             return true;
         }
@@ -49,6 +53,10 @@ class CustomerPolicy
      */
     public function update(User $user, Customer $customer): bool
     {
+        if ($user->agent) {
+            return $user->agent->id === $customer->agent_id;
+        }
+
         if ($user->can('customers.view')) {
             return true;
         }
