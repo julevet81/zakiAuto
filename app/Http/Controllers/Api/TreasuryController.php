@@ -3,61 +3,90 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\TreasuryTransactionResource;
+use App\Http\Requests\StoreTreasuryDepositRequest;
 use App\Models\TreasuryTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class TreasuryController extends Controller
 {
     /**
-     * Display treasury dashboard stats and paginated transactions list.
+     * Current treasury balance + recent movements.
      */
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('treasury.view');
 
-        // 1. Calculate dashboard stats
-        $latestTransaction = TreasuryTransaction::query()->latest('id')->first();
-        $currentBalance = $latestTransaction ? (float) $latestTransaction->current_balence : 0.0;
-
-        $stats = [
-            'current_balance' => $currentBalance,
-            'total_in' => (float) TreasuryTransaction::query()->where('direction', TreasuryTransaction::DIRECTION_IN)->sum('amount'),
-            'total_out' => (float) TreasuryTransaction::query()->where('direction', TreasuryTransaction::DIRECTION_OUT)->sum('amount'),
-            'in_count' => TreasuryTransaction::query()->where('direction', TreasuryTransaction::DIRECTION_IN)->count(),
-            'out_count' => TreasuryTransaction::query()->where('direction', TreasuryTransaction::DIRECTION_OUT)->count(),
-            'breakdown' => [
-                'customer_payment' => (float) TreasuryTransaction::query()
-                    ->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
-                    ->sum('amount'),
-                'agent_remittance' => (float) TreasuryTransaction::query()
-                    ->where('source_type', TreasuryTransaction::SOURCE_AGENT_REMITTANCE)
-                    ->sum('amount'),
-                'supplier_payment' => (float) TreasuryTransaction::query()
-                    ->where('source_type', TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT)
-                    ->sum('amount'),
-                'expense' => (float) TreasuryTransaction::query()
-                    ->where('source_type', TreasuryTransaction::SOURCE_EXPENSE)
-                    ->sum('amount'),
-            ],
-        ];
-
-        // 2. Fetch detailed transactions with filtering
-        $query = TreasuryTransaction::query()
-            ->with('creator')
-            ->when($request->filled('direction'), fn($q) => $q->where('direction', $request->string('direction')))
-            ->when($request->filled('source_type'), fn($q) => $q->where('source_type', $request->string('source_type')))
+        $transactions = TreasuryTransaction::query()
+            ->with('creator:id,name')
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('transaction_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')));
+            ->when($request->filled('date_to'),   fn($q) => $q->whereDate('transaction_date', '<=', $request->date('date_to')))
+            ->when($request->filled('direction'), fn($q) => $q->where('direction', $request->string('direction')))
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 30));
 
-        $transactions = $query->orderByDesc('id')->paginate($request->integer('per_page', 15));
+        $currentBalance = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
 
         return response()->json([
-            'stats' => $stats,
-            'transactions' => TreasuryTransactionResource::collection($transactions)->response()->getData(true),
+            'current_balance' => $currentBalance,
+            'data'            => $transactions->map(fn($tx) => [
+                'id'               => $tx->id,
+                'direction'        => $tx->direction,
+                'amount'           => (float) $tx->amount,
+                'previous_balence' => (float) $tx->previous_balence,
+                'current_balence'  => (float) $tx->current_balence,
+                'source_type'      => $tx->source_type,
+                'source_id'        => $tx->source_id,
+                'transaction_date' => $tx->transaction_date?->format('Y-m-d'),
+                'notes'            => $tx->notes,
+                'creator'          => $tx->creator ? [
+                    'id'   => $tx->creator->id,
+                    'name' => $tx->creator->name,
+                ] : null,
+                'created_at'       => $tx->created_at,
+            ]),
+            'meta' => [
+                'current_page' => $transactions->currentPage(),
+                'last_page'    => $transactions->lastPage(),
+                'per_page'     => $transactions->perPage(),
+                'total'        => $transactions->total(),
+            ],
         ]);
+    }
+
+    /**
+     * Deposit an arbitrary amount into the company treasury with no
+     * conditions — used for opening balances, cash injections, capital
+     * contributions, or any direct credit the accountant needs to record.
+     *
+     * No linked source is required (source_type = 'manual_deposit').
+     * The posted entry is append-only and cannot be edited; if a
+     * correction is needed, post a matching "out" entry instead.
+     */
+    public function deposit(StoreTreasuryDepositRequest $request): JsonResponse
+    {
+        $prev   = (float) (TreasuryTransaction::query()->latest('id')->value('current_balence') ?? 0);
+        $amount = (float) $request->validated('amount');
+
+        $transaction = TreasuryTransaction::create([
+            'direction'        => TreasuryTransaction::DIRECTION_IN,
+            'amount'           => $amount,
+            'previous_balence' => $prev,
+            'current_balence'  => $prev + $amount,
+            'source_type'      => 'manual_deposit',
+            'source_id'        => 0,
+            'transaction_date' => $request->validated('transaction_date'),
+            'notes'            => $request->validated('notes') ?? 'إيداع يدوي مباشر في الخزينة',
+            'created_by'       => $request->user()->id,
+        ]);
+
+        return response()->json([
+            'message'         => 'تم إيداع المبلغ في الخزينة بنجاح',
+            'amount_deposited' => (float) $transaction->amount,
+            'new_balance'      => (float) $transaction->current_balence,
+            'transaction_id'   => $transaction->id,
+            'transaction_date' => $transaction->transaction_date->format('Y-m-d'),
+        ], 201);
     }
 }

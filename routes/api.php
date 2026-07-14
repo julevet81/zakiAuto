@@ -162,6 +162,7 @@ Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
     // ------------------------------------------------------------------
     Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('tresury/summary', [TreasuryController::class, 'index']);
+    Route::post('treasury/deposit', [TreasuryController::class, 'deposit']);
 
     // ------------------------------------------------------------------
     // عاشرًا: إدارة المستخدمين والصلاحيات
