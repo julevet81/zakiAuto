@@ -42,7 +42,6 @@ class RolesAndPermissionsSeeder extends Seeder
         'customer_payments.create',
         'customer_payments.update',
         'customer_payments.delete',
-        'customer_payments.view_own', // a customer viewing only their own payments
 
         // Supplier payments
         'supplier_payments.view',
@@ -55,14 +54,12 @@ class RolesAndPermissionsSeeder extends Seeder
         'agent_transactions.create',
         'agent_transactions.update',
         'agent_transactions.delete',
-        'agent_transactions.view_own', // an agent viewing only their own ledger
 
         // Treasury (company-wide cash movements)
         'treasury.view',
         'treasury.create',
 
         // Orders - status workflow & scoped visibility
-        'orders.view_own',     // customer: only their own orders
         'orders.view_assigned', // agent: only orders for their own customers
         'orders.change_status',
 
@@ -76,6 +73,8 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Customers/agents scoped visibility
         'customers.view_assigned', // agent: only their own customers
+        'customer_payments.view_own', // agent: only payments for their own customers
+        'agent_transactions.view_own', // agent: only their own ledger entries
 
         // Dashboard & reports
         'dashboard.view',
@@ -146,10 +145,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.create',
             'customers.update',
             'orders.view_assigned',
-            'agent_transactions.view_own',
             'customer_payments.create',
-            'customer_payments.view_own',
             'cars.view',
+            'orders.change_status',
+            'orders.update',
+            'orders.create',
+            'agent_transactions.view_own',
+            'customer_payments.view_own',
         ]);
 
         

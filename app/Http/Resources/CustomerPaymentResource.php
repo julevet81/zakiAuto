@@ -26,7 +26,6 @@ class CustomerPaymentResource extends JsonResource
             'received_by' => $this->received_by,
 
             'agent_id' => $this->agent_id,
-            'agent' => new AgentMiniResource($this->whenLoaded('agent')),
 
             'remittance_id' => $this->id,
 

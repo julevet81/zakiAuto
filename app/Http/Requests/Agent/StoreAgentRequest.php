@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Agent;
 
+use App\Models\Agent;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,7 +10,7 @@ class StoreAgentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', \App\Models\Agent::class);
+        return $this->user()->can('create', Agent::class);
     }
 
     /**

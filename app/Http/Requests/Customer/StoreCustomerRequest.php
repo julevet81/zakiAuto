@@ -18,29 +18,31 @@ class StoreCustomerRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'name' => ['required', 'string', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:150'],
-            'national_id' => ['required', 'string', 'max:50'],
-            'passport_no' => ['required', 'string', 'max:50'],
-            'address' => ['nullable', 'string'],
-            'agent_id' => [
-                'nullable',
-                'integer',
-                'exists:agents,id',
-                Rule::prohibitedIf(! $this->user()->can('customers.view')),
-            ],
-        ];
-    }
+        $isAdmin = $this->user()->can('customers.view');
 
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'agent_id.prohibited' => 'لا تملك صلاحية تحديد الوكيل مباشرة',
+        $rules = [
+            'name'        => ['required', 'string', 'max:150'],
+            'phone'       => ['nullable', 'string', 'max:30'],
+            'email'       => [
+                'nullable',
+                'email',
+                'max:150',
+                Rule::unique('customers', 'email')
+            ],
+            'national_id' => ['nullable', 'string', 'max:50'],
+            'passport_no' => ['nullable', 'string', 'max:50'],
+            'address'     => ['nullable', 'string'],
         ];
+
+        // agent_id is only validated when sent by admin/super-admin.
+        // An agent creating a customer is auto-linked to themselves in
+        // CustomerController::store() — they must NOT send agent_id at all.
+        // If they do send it, it is silently ignored (not in rules = not
+        // in validated() = never reaches the controller).
+        if ($isAdmin) {
+            $rules['agent_id'] = ['nullable', 'integer', 'exists:agents,id'];
+        }
+
+        return $rules;
     }
 }

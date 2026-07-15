@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\CustomerDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class CustomerController extends Controller
@@ -70,7 +71,8 @@ class CustomerController extends Controller
      */
     public function store(StoreCustomerRequest $request): JsonResponse
     {
-        $agentId = null;
+        
+        
         if ($request->user()->agent) {
             $agentId = $request->user()->agent->id;
         } elseif ($request->user()->can('customers.view')) {
@@ -78,7 +80,7 @@ class CustomerController extends Controller
         }
 
         $customer = Customer::create([
-            'agent_id'    => $agentId,
+            'agent_id'    => $agentId ?? null,
             'name'        => $request->validated('name'),
             'email'       => $request->validated('email'),
             'phone'       => $request->validated('phone'),

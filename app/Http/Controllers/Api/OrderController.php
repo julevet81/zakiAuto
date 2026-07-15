@@ -41,8 +41,6 @@ class OrderController extends Controller
                 ->when($request->filled('agent_id'), fn($q) => $q->where('agent_id', $request->integer('agent_id')));
         } elseif ($user->can('orders.view_assigned')) {
             $query->where('agent_id', $user->agent?->id ?? 0);
-        } elseif ($user->can('orders.view_own')) {
-            $query->where('customer_id', $user->customer?->id ?? 0);
         }
 
         $orders = $query->orderByDesc('id')->paginate($request->integer('per_page', 15));
@@ -109,7 +107,7 @@ class OrderController extends Controller
 
         $order->load(['customer', 'car', 'agent', 'invoice']);
 
-        if ($request->user()->can('customer_payments.view') || $request->user()->can('customer_payments.view_own')) {
+        if ($request->user()->can('customer_payments.view')) {
             $order->load('payments');
         }
 

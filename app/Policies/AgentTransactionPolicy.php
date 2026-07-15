@@ -9,7 +9,7 @@ class AgentTransactionPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('agent_transactions.view') || $user->can('agent_transactions.view_own');
+        return $user->can('agent_transactions.view');
     }
 
     /**

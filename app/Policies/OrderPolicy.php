@@ -15,8 +15,7 @@ class OrderPolicy
     public function viewAny(User $user): bool
     {
         return $user->can('orders.view')
-            || $user->can('orders.view_assigned')
-            || $user->can('orders.view_own');
+            || $user->can('orders.view_assigned');
     }
 
     /**
@@ -39,9 +38,7 @@ class OrderPolicy
             return $user->agent?->id === $order->agent_id;
         }
 
-        if ($user->can('orders.view_own')) {
-            return $user->customer?->id === $order->customer_id;
-        }
+        
 
         return false;
     }
