@@ -573,21 +573,21 @@ class DemoDataSeeder extends Seeder
     //     }
     // }
 
-    // private function seedSettings(): void
-    // {
-    //     $settings = [
-    //         'company_name' => 'Zaki Auto',
-    //         'company_phone' => '+213550000000',
-    //         'company_email' => 'contact@zaki-auto.test',
-    //         'default_currency' => 'DZD',
-    //         'invoice_prefix' => 'INV',
-    //         'order_prefix' => 'ORD',
-    //     ];
+    private function seedSettings(): void
+    {
+        $settings = [
+            'company_name' => 'Zaki Auto',
+            'company_phone' => '+213550000000',
+            'company_email' => 'contact@zaki-auto.test',
+            'default_currency' => 'DZD',
+            'invoice_prefix' => 'INV',
+            'order_prefix' => 'ORD',
+        ];
 
-    //     foreach ($settings as $key => $value) {
-    //         Setting::query()->updateOrCreate(['key' => $key], ['value' => $value]);
-    //     }
-    // }
+        foreach ($settings as $key => $value) {
+            Setting::query()->updateOrCreate(['key' => $key], ['value' => $value]);
+        }
+    }
 
     // private function treasury(
     //     string $direction,
