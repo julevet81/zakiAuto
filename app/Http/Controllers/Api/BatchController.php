@@ -23,8 +23,8 @@ class BatchController extends Controller
         $batches = Batch::query()
             ->with('supplier')
             ->withCount('cars')
-            ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->integer('supplier_id')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('supplier_id'), fn($q) => $q->where('supplier_id', $request->integer('supplier_id')))
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 15));
 
@@ -35,7 +35,7 @@ class BatchController extends Controller
     {
         $batch = Batch::create(
             $request->validated()
-            + ['status' => $request->input('status', Batch::STATUS_PARTIAL)]
+                + ['status' => $request->input('status', Batch::STATUS_PARTIAL)]
         );
 
         // exchange_rate stays NULL at creation — no payments exist yet.
@@ -61,14 +61,6 @@ class BatchController extends Controller
     public function update(UpdateBatchRequest $request, Batch $batch): JsonResponse
     {
         $batch->update($request->validated());
-
-        // If total_cost_foreign was changed, the exchange_rate formula's
-        // denominator has changed — recompute immediately so the stored
-        // value stays consistent with the new target cost, even if no
-        // new payment was recorded in this request.
-        if ($request->has('total_cost_foreign')) {
-            $batch->recomputeExchangeRate(save: true);
-        }
 
         return response()->json([
             'message' => 'تم تحديث دفعة الاستيراد بنجاح',

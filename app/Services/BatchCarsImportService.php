@@ -25,19 +25,20 @@ class BatchCarsImportService
     private const COL_COLOR = 4;
     private const COL_VIN = 5;
     private const COL_PURCHASE_PRICE = 6;
-    private const COL_TRACKING_NUMBER = 7;
-    private const COL_CUSTOMER_NAME = 8;
-    private const COL_PASSPORT_NO = 9;
-    private const COL_NATIONAL_ID = 10;
-    private const COL_SHIPPING_COST = 11;
-    private const COL_ARRIVAL_DATE = 12;
+    private const COL_SALE_PRICE = 7;
+    private const COL_TRACKING_NUMBER = 8;
+    private const COL_CUSTOMER_NAME = 9;
+    private const COL_PASSPORT_NO = 10;
+    private const COL_NATIONAL_ID = 11;
+    private const COL_SHIPPING_COST = 12;
+    private const COL_ARRIVAL_DATE = 13;
 
     /**
      * Create the Batch and import every car row from the uploaded file.
      * The whole import is atomic: if any car row fails, all records created
      * by this import are rolled back.
      *
-     * @param  array{supplier_id:int, container_opener_id:?int, purchase_date:?string, total_cost_foreign:?float, notes:?string}  $data
+     * @param  array{supplier_id:int, container_opener_id:?int, purchase_date:?string, notes:?string}  $data
      * @return array{batch: Batch, created: int, skipped: int, errors: array<int, array{row:int|null, errors: array<int,string>}>}
      */
     public function import(array $data, $file, int $createdBy): array
@@ -52,7 +53,6 @@ class BatchCarsImportService
             $batch = Batch::create([
                 'supplier_id' => $supplierId,
                 'purchase_date' => $data['purchase_date'] ?? null,
-                'total_cost_foreign' => $data['total_cost_foreign'] ?? 0,
                 'notes' => $data['notes'] ?? null,
                 'status' => Batch::STATUS_PARTIAL,
             ]);
@@ -97,6 +97,12 @@ class BatchCarsImportService
 
             $batch->update(['cars_count' => $batch->cars()->count()]);
 
+            // total_cost_foreign is derived from the cars just imported;
+            // it feeds the exchange_rate formula's denominator, so both
+            // are recomputed together (one DB write via recomputeExchangeRate).
+            $batch->recomputeTotalCostForeign(save: false);
+            $batch->recomputeExchangeRate(save: true);
+
             return [
                 'batch' => $batch->fresh(['supplier', 'cars']),
                 'created' => $created,
@@ -118,6 +124,7 @@ class BatchCarsImportService
         $color = $this->nullableString($row->get(self::COL_COLOR));
         $vin = $this->nullableString($row->get(self::COL_VIN));
         $purchasePrice = $row->get(self::COL_PURCHASE_PRICE);
+        $salePriceRaw = $row->get(self::COL_SALE_PRICE);
         $trackingNumber = $this->nullableString($row->get(self::COL_TRACKING_NUMBER));
         $customerName = trim((string) $row->get(self::COL_CUSTOMER_NAME));
         $passportNo = $row->get(self::COL_PASSPORT_NO);
@@ -134,20 +141,27 @@ class BatchCarsImportService
         if (! is_numeric($purchasePrice) || (float) $purchasePrice < 0) {
             throw new \RuntimeException('سعر الشراء غير صالح');
         }
+        if ($salePriceRaw !== null && trim((string) $salePriceRaw) !== '' && (! is_numeric($salePriceRaw) || (float) $salePriceRaw < 0)) {
+            throw new \RuntimeException('سعر البيع غير صالح');
+        }
         if ($customerName === '') {
             throw new \RuntimeException('اسم العميل حقل إلزامي لإنشاء الطلب');
         }
         if ($vin !== null && Car::where('vin', $vin)->exists()) {
             throw new \RuntimeException("رقم الهيكل (VIN) مكرر: {$vin}");
         }
-        if ($passportNo === '' ) {
+        if ($passportNo === '') {
             throw new \RuntimeException('يجب إدخال رقم جواز السفر للعميل');
         }
-        if ($nationalId === '' ) {
+        if ($nationalId === '') {
             throw new \RuntimeException('يجب إدخال رقم الهوية الوطنية للعميل');
         }
 
         $arrivalDate = $this->parseDate($arrivalDateRaw);
+
+        $salePrice = ($salePriceRaw !== null && trim((string) $salePriceRaw) !== '')
+            ? (float) $salePriceRaw
+            : (float) $purchasePrice;
 
         $car = Car::create([
             'batch_id' => $batch->id,
@@ -161,7 +175,7 @@ class BatchCarsImportService
             'vin' => $vin,
             'foreign_purchase_price' => (float) $purchasePrice,
             'shipping_cost' => (float) $shippingCost,
-            'sale_price' => (float) $purchasePrice,
+            'sale_price' => $salePrice,
             'tracking_number' => $trackingNumber,
             'arrival_date' => $arrivalDate,
             'status' => Car::STATUS_SHIPPING,

@@ -68,12 +68,13 @@ class BatchCarsImport implements WithMultipleSheets
  *   4  اللون                 -> color
  *   5  رقم الهيكل (VIN)      -> vin
  *   6  سعر الشراء (تكلفة)    -> foreign_purchase_price
- *   7  رقم التتبع            -> tracking_number
- *   8  اسم العميل الكامل     -> customer_name
- *   9  رقم جواز السفر        -> passport_no
- *   10 رقم البطاقة الوطنية   -> national_id
- *   11 تكلفة الشحن           -> shipping_cost
- *   12 تاريخ الوصول          -> arrival_date
+ *   7  سعر البيع             -> sale_price (اختياري: إذا ترك فارغًا يُستخدم سعر الشراء)
+ *   8  رقم التتبع            -> tracking_number
+ *   9  اسم العميل الكامل     -> customer_name
+ *   10 رقم جواز السفر        -> passport_no
+ *   11 رقم البطاقة الوطنية   -> national_id
+ *   12 تكلفة الشحن           -> shipping_cost
+ *   13 تاريخ الوصول          -> arrival_date
  *
  * Row 1 is the header row and is skipped via WithStartRow(2).
  *

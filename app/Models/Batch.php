@@ -23,7 +23,9 @@ class Batch extends Model
         'batch_number',
         'supplier_id',
         'purchase_date',
-        'total_cost_foreign',       // user-entered: total agreed cost in foreign currency
+        // total_cost_foreign is intentionally NOT in $fillable — it is
+        // always derived from SUM(cars.foreign_purchase_price) via
+        // recomputeTotalCostForeign() and never accepted from user input.
         'total_paid_amount_foreign', // auto-computed: sum of all supplier_payments.amount_foreign
         // exchange_rate is intentionally NOT in $fillable — it is always
         // recomputed by recomputeExchangeRate() and never accepted from
@@ -89,6 +91,33 @@ class Batch extends Model
     public function getTotalPaidLocalAttribute(): float
     {
         return (float) $this->payments()->sum('amount_local');
+    }
+
+    /**
+     * Recompute and persist total_cost_foreign as the sum of
+     * foreign_purchase_price across every car belonging to this batch.
+     *
+     * total_cost_foreign is no longer entered by the user: it is fully
+     * derived from the batch's cars, since it also serves as the
+     * denominator of the recomputeExchangeRate() formula.
+     *
+     * Callers that add/remove/edit a car's price should call this
+     * afterwards, then follow it with recomputeExchangeRate() to keep the
+     * stored rate consistent with the new total (the rate's denominator
+     * just changed even if no supplier_payment was touched).
+     *
+     * @param  bool  $save  Persist immediately (default true). Pass false
+     *                      when the caller is about to call
+     *                      recomputeExchangeRate(save: true) right after,
+     *                      which will save both fields in one query.
+     */
+    public function recomputeTotalCostForeign(bool $save = true): void
+    {
+        $this->total_cost_foreign = $this->cars()->sum('foreign_purchase_price');
+
+        if ($save) {
+            $this->save();
+        }
     }
 
     /**

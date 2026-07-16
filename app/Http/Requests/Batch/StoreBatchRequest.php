@@ -22,11 +22,11 @@ class StoreBatchRequest extends FormRequest
             'supplier_id'         => ['required', 'integer', 'exists:suppliers,id'],
             'purchase_date'       => ['nullable', 'date'],
 
-            // Total agreed purchase cost in foreign currency — required for
-            // exchange_rate to be calculable. May be supplied later via
-            // PUT/PATCH if not yet known at creation time, but the batch's
-            // exchange_rate will remain NULL until it is provided.
-            'total_cost_foreign'  => ['nullable', 'numeric', 'min:0'],
+            // total_cost_foreign is NOT accepted from user input — it is
+            // always derived automatically from the batch's cars
+            // (see Batch::recomputeTotalCostForeign()). A batch created
+            // here has no cars yet, so it starts at 0 until cars are
+            // added/imported.
 
             // exchange_rate is NOT accepted from user input — it is always
             // derived automatically from supplier payments by the model.
