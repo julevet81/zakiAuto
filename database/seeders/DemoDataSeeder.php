@@ -33,34 +33,34 @@ class DemoDataSeeder extends Seeder
     /**
      * Seed realistic demo data without deleting existing records.
      */
-    public function run(): void
-    {
-        DB::transaction(function () {
-            $this->admin = $this->user(
-                'admin@zaki.com',
-                'Admin User',
-                '0550000001',
-                'admin'
-            );
+    // public function run(): void
+    // {
+    //     // DB::transaction(function () {
+    //     //     $this->admin = $this->user(
+    //     //         'admin@zaki.com',
+    //     //         'Admin User',
+    //     //         '0550000001',
+    //     //         'admin'
+    //     //     );
 
-            //$agents = $this->seedAgents();
-            //$customers = $this->seedCustomers($agents);
-            //$suppliers = $this->seedSuppliers();
-            $containerOpeners = $this->seedContainerOpeners();
-            //$serviceProviders = $this->seedServiceProviders();
-            //$batches = $this->seedBatches($suppliers);
-            //$cars = $this->seedCars($batches, $suppliers, $containerOpeners);
+    //         //$agents = $this->seedAgents();
+    //         //$customers = $this->seedCustomers($agents);
+    //         //$suppliers = $this->seedSuppliers();
+    //         //$containerOpeners = $this->seedContainerOpeners();
+    //         //$serviceProviders = $this->seedServiceProviders();
+    //         //$batches = $this->seedBatches($suppliers);
+    //         //$cars = $this->seedCars($batches, $suppliers, $containerOpeners);
 
-            // $this->seedCarExpenses($cars);
-            // $this->seedDocuments($cars);
-            // $this->seedSupplierPayments($batches);
-            // $orders = $this->seedOrders($customers, $agents, $cars);
-            // $this->seedCustomerPayments($orders);
-            // $this->seedExpenses($orders, $cars, $serviceProviders);
-            // $this->seedInvoices($orders);
-            // $this->seedSettings();
-        });
-    }
+    //         // $this->seedCarExpenses($cars);
+    //         // $this->seedDocuments($cars);
+    //         // $this->seedSupplierPayments($batches);
+    //         // $orders = $this->seedOrders($customers, $agents, $cars);
+    //         // $this->seedCustomerPayments($orders);
+    //         // $this->seedExpenses($orders, $cars, $serviceProviders);
+    //         // $this->seedInvoices($orders);
+    //         // $this->seedSettings();
+    //     });
+    // }
 
     // private function user(string $email, string $name, string $phone, string $role): User
     // {
