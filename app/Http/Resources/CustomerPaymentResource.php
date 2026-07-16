@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -23,7 +24,7 @@ class CustomerPaymentResource extends JsonResource
             'customer' => new CustomerMiniResource($this->whenLoaded('customer')),
 
             'amount' => (float) $this->amount,
-            'received_by' => $this->received_by,
+            'received_by' => Auth::user()->name,
 
             'agent_id' => $this->agent_id,
 

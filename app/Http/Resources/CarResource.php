@@ -58,10 +58,9 @@ class CarResource extends JsonResource
             // car came from (operational) but never this figure (cost).
             'foreign_purchase_price' => $this->when($canSeeCosts, (float) $this->foreign_purchase_price),
             'shipping_cost' => $this->when($canSeeCosts, (float) $this->shipping_cost),
-            'exchange_rate' => $this->when($canSeeCosts, (float) ($this->batch?->exchange_rate ?? Setting::where('key', 'current_exchange_rate')->value('value'))),
+            'exchange_rate' => $this->when($canSeeCosts, (float) ($this->batch?->exchange_rate ?? Setting::where('key','current_exchange_rate')->value('value'))),
             'total_cost_local' => $this->when($canSeeCosts, (float) $this->total_cost_local),
             'profit' => $this->when($canSeeCosts, (float) $this->profit),
-            'profit_percentage' => $this->when($canSeeCosts, $this->profit_percentage),
             'sale_price' => (float) $this->sale_price,
 
             'tracking_number' => $this->tracking_number,

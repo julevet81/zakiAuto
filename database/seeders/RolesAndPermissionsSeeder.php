@@ -152,6 +152,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'orders.create',
             'agent_transactions.view_own',
             'customer_payments.view_own',
+            
+            
         ]);
 
         

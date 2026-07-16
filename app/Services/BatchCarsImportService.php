@@ -98,7 +98,7 @@ class BatchCarsImportService
             $batch->update(['cars_count' => $batch->cars()->count()]);
 
             return [
-                'batch' => $batch->fresh(['supplier']),
+                'batch' => $batch->fresh(['supplier', 'cars']),
                 'created' => $created,
                 'skipped' => 0,
                 'errors' => [],
