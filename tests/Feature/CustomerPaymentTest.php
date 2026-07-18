@@ -145,4 +145,60 @@ class CustomerPaymentTest extends TestCase
             'source_id' => $payment->id,
         ]);
     }
+
+    public function test_customer_payment_treasury_transfer_statuses(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        // 1. Direct payment to company (should be automatically in treasury, general treasury status: null)
+        $directResponse = $this->postJson('/api/customer-payments', [
+            'order_id' => $this->order->id,
+            'customer_id' => $this->customer->id,
+            'amount' => 5000,
+            'payment_date' => now()->toDateString(),
+            'notes' => 'Direct payment to company',
+        ]);
+        $directResponse->assertCreated();
+        $directResponse->assertJsonPath('data.is_transferred_to_treasury', true);
+        $directResponse->assertJsonPath('data.general_treasury_transfer_status', null);
+
+        $directPaymentId = $directResponse->json('data.id');
+
+        // 2. Agent payment (not remitted, is_transferred_to_treasury: false, general treasury status: null)
+        $agentResponse = $this->postJson('/api/customer-payments', [
+            'order_id' => $this->order->id,
+            'customer_id' => $this->customer->id,
+            'amount' => 4000,
+            'agent_id' => $this->agent->id,
+            'payment_date' => now()->toDateString(),
+            'notes' => 'Agent collected payment',
+        ]);
+        $agentResponse->assertCreated();
+        $agentResponse->assertJsonPath('data.is_transferred_to_treasury', false);
+        $agentResponse->assertJsonPath('data.general_treasury_transfer_status', null);
+
+        $agentPaymentId = $agentResponse->json('data.id');
+
+        // Let's verify the index endpoint returns the new fields too
+        $indexResponse = $this->getJson('/api/customer-payments');
+        $indexResponse->assertOk();
+        
+        $directPaymentData = collect($indexResponse->json('data'))->firstWhere('id', $directPaymentId);
+        $this->assertTrue($directPaymentData['is_transferred_to_treasury']);
+        $this->assertNull($directPaymentData['general_treasury_transfer_status']);
+
+        $agentPaymentData = collect($indexResponse->json('data'))->firstWhere('id', $agentPaymentId);
+        $this->assertFalse($agentPaymentData['is_transferred_to_treasury']);
+        $this->assertNull($agentPaymentData['general_treasury_transfer_status']);
+
+        // 3. Stage the direct payment for transfer to general treasury (should become pending)
+        $stageResponse = $this->postJson("/api/customer-payments/{$directPaymentId}/transfer-to-treasury");
+        $stageResponse->assertCreated();
+        $stageResponse->assertJsonPath('data.general_treasury_transfer_status', 'pending');
+
+        // 4. Approve the transfer to general treasury (should become approved)
+        $approveResponse = $this->postJson("/api/customer-payments/{$directPaymentId}/approve-treasury-transfer");
+        $approveResponse->assertOk();
+        $approveResponse->assertJsonPath('data.general_treasury_transfer_status', 'approved');
+    }
 }

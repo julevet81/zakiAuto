@@ -86,4 +86,32 @@ class CustomerPayment extends Model
     {
         return $this->agent_id !== null;
     }
+
+    /**
+     * The treasury transaction representing the transfer to the general treasury.
+     */
+    public function generalTreasuryTransfer(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(TreasuryTransaction::class, 'source_id')
+            ->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
+            ->where('direction', TreasuryTransaction::DIRECTION_OUT);
+    }
+
+    /**
+     * Determine if this customer payment has reached/been transferred to the company treasury.
+     */
+    public function getIsTransferredToTreasuryAttribute(): bool
+    {
+        // تكون true فقط إذا تمت الموافقة على تحويلها للخزينة العامة
+        return $this->generalTreasuryTransfer?->status === 'approved';
+    }
+
+
+    /**
+     * Get the general treasury transfer status (pending, approved, or null).
+     */
+    public function getGeneralTreasuryTransferStatusAttribute(): ?string
+    {
+        return $this->generalTreasuryTransfer?->status;
+    }
 }

@@ -32,7 +32,7 @@ class CustomerPaymentController extends Controller
         $user = $request->user();
 
         $query = CustomerPayment::query()
-            ->with(['customer', 'agent'])
+            ->with(['customer', 'agent', 'generalTreasuryTransfer'])
             ->when($request->filled('order_id'), fn($q) => $q->where('order_id', $request->integer('order_id')))
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('payment_date', '>=', $request->date('date_from')))
             ->when($request->filled('date_to'), fn($q) => $q->whereDate('payment_date', '<=', $request->date('date_to')));
@@ -116,7 +116,7 @@ class CustomerPaymentController extends Controller
 
         return response()->json([
             'message' => 'تم تسجيل دفعة العميل بنجاح',
-            'data' => new CustomerPaymentResource($payment->load(['customer', 'agent', 'creator'])),
+            'data' => new CustomerPaymentResource($payment->load(['customer', 'agent', 'creator', 'generalTreasuryTransfer'])),
         ], 201);
     }
 
@@ -124,7 +124,7 @@ class CustomerPaymentController extends Controller
     {
         $this->authorize('view', $customerPayment);
 
-        $customerPayment->load(['customer', 'agent', 'order', 'creator']);
+        $customerPayment->load(['customer', 'agent', 'order', 'creator', 'generalTreasuryTransfer']);
 
         return response()->json([
             'data' => new CustomerPaymentResource($customerPayment),
@@ -339,7 +339,7 @@ class CustomerPaymentController extends Controller
         return response()->json([
             'message' => 'تم إرسال الدفعة للخزينة العامة، بانتظار اعتماد الإدارة',
             'data' => new CustomerPaymentResource(
-                $customerPayment->fresh(['customer', 'agent', 'creator'])
+                $customerPayment->fresh(['customer', 'agent', 'creator', 'generalTreasuryTransfer'])
             ),
             'treasury_transfer_id' => $transfer->id,
         ], 201);
@@ -384,7 +384,7 @@ class CustomerPaymentController extends Controller
 
         return response()->json([
             'message' => 'تم اعتماد تحويل الدفعة إلى الخزينة العامة بنجاح',
-            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator'])),
+            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator', 'generalTreasuryTransfer'])),
         ]);
     }
 

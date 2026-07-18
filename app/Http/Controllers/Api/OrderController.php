@@ -29,8 +29,14 @@ class OrderController extends Controller
 
         $user = $request->user();
 
+        // أول طلب (أقل id) لكل سيارة - هيتم استثناؤه
+        $firstOrderIdsPerCar = Order::query()
+            ->selectRaw('MIN(id) as id')
+            ->groupBy('car_id');
+
         $query = Order::query()
             ->with(['customer', 'car', 'agent'])
+            ->whereNotIn('id', $firstOrderIdsPerCar)
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')));
 
         if ($user->agent) {

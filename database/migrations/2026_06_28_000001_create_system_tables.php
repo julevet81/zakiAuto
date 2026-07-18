@@ -141,6 +141,8 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
+
+            $table->index(['car_id', 'id']);
         });
 
         // 10. customer_payments (remittance_id added as nullable column first)

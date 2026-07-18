@@ -24,6 +24,7 @@ class StoreOrderRequest extends FormRequest
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'car_id' => ['required', 'integer', 'exists:cars,id'],
             'agent_id' => ['nullable', 'integer', 'exists:agents,id'],
+            'paid_amount' => ['nullable', 'numeric', 'min:0'],
             'purchase_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
         ];

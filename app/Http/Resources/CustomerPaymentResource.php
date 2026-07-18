@@ -28,7 +28,9 @@ class CustomerPaymentResource extends JsonResource
 
             'agent_id' => $this->agent_id,
 
-            'remittance_id' => $this->id,
+            'remittance_id' => $this->remittance_id,
+            'is_transferred_to_treasury' => $this->is_transferred_to_treasury,
+            'general_treasury_transfer_status' => $this->general_treasury_transfer_status,
 
             'attachment' => $this->attachment,
             'attachment_url' => $this->attachment ? Storage::disk('public')->url($this->attachment) : null,
