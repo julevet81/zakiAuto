@@ -110,6 +110,20 @@ class SupplierPaymentController extends Controller
                 abort(422, 'لا توجد دفعات استيراد مفتوحة لهذا المورد تحتاج سداد. تأكد من إدخال total_cost_foreign لكل دفعة.');
             }
 
+            $totalDue = 0.0;
+            foreach ($batches as $batch) {
+                $totalCost   = (float) $batch->total_cost_foreign;
+                $alreadyPaid = (float) $batch->payments()->sum('amount_foreign');
+                $batchNeeds  = round($totalCost - $alreadyPaid, 4);
+                if ($batchNeeds > 0) {
+                    $totalDue += $batchNeeds;
+                }
+            }
+
+            if ($remaining > round($totalDue, 4)) {
+                abort(422, 'المبلغ المدفوع أكبر من إجمالي المستحق للمورد. إجمالي المستحق الحالي: ' . round($totalDue, 2));
+            }
+
             $totalAmountLocal = 0.0;
 
             foreach ($batches as $batch) {
@@ -224,6 +238,18 @@ class SupplierPaymentController extends Controller
                 : round($amountForeign * $exchangeRate, 2);
 
             $oldBatchId = $supplierPayment->batch_id;
+
+            // Check if the updated amount exceeds the remaining due for the batch
+            $batch = Batch::findOrFail($oldBatchId);
+            $totalCost = (float) $batch->total_cost_foreign;
+            $alreadyPaidExcludingCurrent = (float) $batch->payments()
+                ->where('id', '!=', $supplierPayment->id)
+                ->sum('amount_foreign');
+            $batchNeeds = round($totalCost - $alreadyPaidExcludingCurrent, 4);
+
+            if ($amountForeign > $batchNeeds) {
+                abort(422, 'المبلغ المدفوع أكبر من إجمالي المستحق لهذه الدفعة. إجمالي المستحق الحالي: ' . round($batchNeeds, 2));
+            }
 
             $supplierPayment->update(array_filter([
                 'batch_id'       => $request->validated('batch_id'),
