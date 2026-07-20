@@ -40,7 +40,7 @@ class AgentTransactionResource extends JsonResource
 
             'transaction_date' => $this->transaction_date?->format('Y-m-d'),
             'attachment' => $this->attachment,
-            'attachment_url' => $this->attachment ? Storage::disk('public')->url($this->attachment) : null,
+            'attachment_url' => $this->attachment ? url('storage/' . $this->attachment) : null,
             'notes' => $this->notes,
 
             'created_by' => $this->created_by,
