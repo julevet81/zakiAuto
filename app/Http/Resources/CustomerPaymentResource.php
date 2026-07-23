@@ -33,7 +33,7 @@ class CustomerPaymentResource extends JsonResource
             'general_treasury_transfer_status' => $this->general_treasury_transfer_status,
 
             'attachment' => $this->attachment,
-            'attachment_url' => $this->attachment ? Storage::disk('public')->url($this->attachment) : null,
+            'attachment_url' => $this->attachment ? asset('storage/' . $this->attachment) : null,
 
             'payment_date' => $this->payment_date?->format('Y-m-d'),
             'notes' => $this->notes,
