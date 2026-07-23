@@ -31,10 +31,10 @@ class CustomerDocument extends Model
     }
 
     /**
-     * Full public URL of the file (works dynamically with the current request host and port).
+     * Full public URL of the file (works dynamically with the configured storage disk).
      */
     public function getUrlAttribute(): string
     {
-        return url('storage/' . $this->file_path);
+        return Storage::disk('public')->url($this->file_path);
     }
 }

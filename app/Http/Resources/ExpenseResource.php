@@ -31,7 +31,7 @@ class ExpenseResource extends JsonResource
             'amount' => (float) $this->amount,
 
             'attachment' => $this->attachment,
-            'attachment_url' => $this->attachment ? url('storage/' . $this->attachment) : null,
+            'attachment_url' => $this->attachment ? Storage::disk('public')->url($this->attachment) : null,
 
             'expense_date' => $this->expense_date?->format('Y-m-d'),
             'notes' => $this->notes,
