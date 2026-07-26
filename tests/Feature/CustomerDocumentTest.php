@@ -107,6 +107,36 @@ class CustomerDocumentTest extends TestCase
         Storage::disk('public')->assertExists($document->file_path);
     }
 
+    public function test_customer_document_url_uses_the_current_request_host(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        config(['app.url' => 'http://localhost']);
+        Storage::fake('public');
+
+        $user = User::where('email', 'superadmin@zaki.com')->firstOrFail();
+        Sanctum::actingAs($user);
+
+        $customer = Customer::create([
+            'name' => 'Host Aware Customer',
+            'phone' => '0500000002',
+            'email' => 'host-aware@example.com',
+        ]);
+
+        $file = UploadedFile::fake()->create('passport.pdf', 500, 'application/pdf');
+
+        $response = $this->postJson("http://api.zakiauto.test/api/customers/{$customer->id}/documents", [
+            'files' => [$file],
+            'titles' => ['Passport Copy'],
+        ]);
+
+        $response->assertCreated();
+        $this->assertStringStartsWith(
+            'http://api.zakiauto.test/storage/customer-documents/',
+            $response->json('data.0.url')
+        );
+    }
+
     public function test_fallback_storage_route_serves_stored_file(): void
     {
         Storage::fake('public');

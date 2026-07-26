@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class CustomerDocument extends Model
 {
@@ -31,10 +30,10 @@ class CustomerDocument extends Model
     }
 
     /**
-     * Full public URL of the file (works dynamically with the configured storage disk).
+     * Full public URL of the file.
      */
-    public function getUrlAttribute(): string
+    public function getUrlAttribute(): ?string
     {
-        return Storage::disk('public')->url($this->file_path);
+        return $this->file_path ? asset('storage/' . ltrim($this->file_path, '/')) : null;
     }
 }

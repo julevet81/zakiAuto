@@ -21,7 +21,9 @@ class CustomerDocumentResource extends JsonResource
             'title'       => $this->title,
             'file_type'   => $this->file_type,
             'file_size'   => $this->file_size,
-            'url'         => $this->url, // via getUrlAttribute()
+            'url'         => $this->file_path
+                ? $request->getSchemeAndHttpHost() . '/storage/' . ltrim($this->file_path, '/')
+                : null,
             'uploaded_by' => $this->uploaded_by,
             'uploader'    => $this->whenLoaded('uploader', fn() => [
                 'id'   => $this->uploader->id,
