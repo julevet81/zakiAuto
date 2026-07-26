@@ -34,22 +34,22 @@ class DashboardController extends Controller
 
         if ($user->agent) {
             $agentId = $user->agent->id;
+            $realOrders = $this->realOrdersQuery()->where('agent_id', $agentId);
+            $soldCars = $this->soldCarsQuery($agentId);
+
             $stats = [
                 'customers_count' => Customer::where('agent_id', $agentId)->count(),
                 'suppliers_count' => 0,
-                'cars_count' => Car::whereHas('order', fn($q) => $q->where('agent_id', $agentId))->count(),
-                'orders_count' => Order::where('agent_id', $agentId)->count(),
+                'cars_count' => (clone $soldCars)->count(),
+                'orders_count' => (clone $realOrders)->count(),
                 'agents_count' => 1,
 
-                'orders_by_status' => Order::query()
-                    ->where('agent_id', $agentId)
+                'orders_by_status' => (clone $realOrders)
                     ->select('status', DB::raw('count(*) as count'))
                     ->groupBy('status')
                     ->pluck('count', 'status'),
 
-                'total_sales' => (float) Car::query()
-                    ->whereHas('order', fn($q) => $q->where('agent_id', $agentId))
-                    ->sum('sale_price'),
+                'total_sales' => (float) (clone $soldCars)->sum('sale_price'),
 
                 'total_commissions' => (float) \App\Models\AgentTransaction::query()
                     ->where('agent_id', $agentId)
@@ -59,25 +59,24 @@ class DashboardController extends Controller
             ];
         } else {
             $canSeeProfit = $user->can('reports.view_profit');
+            $realOrders = $this->realOrdersQuery();
+            $soldCars = $this->soldCarsQuery();
 
             $stats = [
                 'customers_count' => Customer::count(),
                 'suppliers_count' => Supplier::count(),
                 'cars_count' => Car::count(),
-                'orders_count' => Order::count(),
+                'orders_count' => (clone $realOrders)->count(),
                 'agents_count' => Agent::count(),
 
-                'orders_by_status' => Order::query()
+                'orders_by_status' => (clone $realOrders)
                     ->select('status', DB::raw('count(*) as count'))
                     ->groupBy('status')
                     ->pluck('count', 'status'),
 
-                // Total sales = sum of sale_price for every car currently
-                // tied to an order (i.e. actually sold), not every car in
-                // inventory.
-                'total_sales' => (float) Car::query()
-                    ->whereHas('order')
-                    ->sum('sale_price'),
+                // The first order on a car is only a placeholder/first-owner
+                // record. A car counts as sold only when it has a later order.
+                'total_sales' => (float) (clone $soldCars)->sum('sale_price'),
 
                 'total_commissions' => (float) \App\Models\AgentTransaction::query()
                     ->where('direction', \App\Models\AgentTransaction::DIRECTION_OUT)
@@ -86,7 +85,7 @@ class DashboardController extends Controller
             ];
 
             if ($canSeeProfit) {
-                $stats['total_purchase_cost'] = (float) Car::query()->whereHas('order')->sum('foreign_purchase_price');
+                $stats['total_purchase_cost'] = (float) (clone $soldCars)->sum('foreign_purchase_price');
                 $stats['total_expenses'] = (float) \App\Models\CarExpense::query()->sum('local_amount')
                     + (float) \App\Models\Expense::query()->sum('amount');
                 $stats['total_profit'] = $stats['total_sales'] - $stats['total_purchase_cost'] - $stats['total_expenses'];
@@ -94,5 +93,25 @@ class DashboardController extends Controller
         }
 
         return response()->json(['data' => $stats]);
+    }
+
+    protected function realOrdersQuery()
+    {
+        return Order::query()->whereNotIn('id', $this->firstOrderIdsPerCarQuery());
+    }
+
+    protected function soldCarsQuery(?int $agentId = null)
+    {
+        return Car::query()->whereHas('orders', function ($query) use ($agentId) {
+            $query->whereNotIn('id', $this->firstOrderIdsPerCarQuery())
+                ->when($agentId, fn($query) => $query->where('agent_id', $agentId));
+        });
+    }
+
+    protected function firstOrderIdsPerCarQuery()
+    {
+        return Order::query()
+            ->selectRaw('MIN(id) as id')
+            ->groupBy('car_id');
     }
 }

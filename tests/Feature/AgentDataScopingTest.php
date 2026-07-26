@@ -309,13 +309,25 @@ class AgentDataScopingTest extends TestCase
         $role = \Spatie\Permission\Models\Role::findByName('agent', 'api');
         $role->givePermissionTo('dashboard.view');
 
+        Order::create([
+            'order_number' => 'ORD-AG1-REAL',
+            'customer_id' => $this->customer1->id,
+            'car_id' => $this->order1->car_id,
+            'agent_id' => $this->agent1->id,
+            'status' => Order::STATUS_SOLD,
+            'remaining_amount' => 10000,
+        ]);
+
         Sanctum::actingAs($this->user1);
 
         $response = $this->getJson('/api/dashboard');
         $response->assertOk();
 
-        // Total global orders is 2, but Agent 1 should only see 1 order
+        // The first order per car is not a real sale, so only the later
+        // order for Agent 1 is counted.
         $response->assertJsonPath('data.orders_count', 1);
+        $response->assertJsonPath('data.cars_count', 1);
+        $response->assertJsonPath('data.total_sales', 10000);
         $response->assertJsonPath('data.customers_count', 1);
         $response->assertJsonPath('data.agents_count', 1);
     }
