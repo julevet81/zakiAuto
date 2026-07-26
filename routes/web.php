@@ -15,6 +15,9 @@ Route::get('/run-seeders', function () {
 Route::get('/clear-cache', function () {
     Artisan::call('permission:cache-reset');
     Artisan::call('optimize:clear');
+    Artisan::call('config:clear');
+    Artisan::call('cache:clear');
+    Artisan::call('route:clear');
     return 'Cache cleared';
 });
 

@@ -106,4 +106,17 @@ class CustomerDocumentTest extends TestCase
         $document = $customer->customerDocuments()->first();
         Storage::disk('public')->assertExists($document->file_path);
     }
+
+    public function test_fallback_storage_route_serves_stored_file(): void
+    {
+        Storage::fake('public');
+
+        // Save a dummy file in public disk
+        Storage::disk('public')->put('customer-documents/test.txt', 'Hello World');
+
+        $response = $this->get('/storage/customer-documents/test.txt');
+
+        $response->assertOk();
+        $this->assertEquals('Hello World', $response->streamedContent());
+    }
 }

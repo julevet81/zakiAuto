@@ -35,6 +35,6 @@ class CustomerDocument extends Model
      */
     public function getUrlAttribute(): string
     {
-        return asset('storage/' . $this->file_path);
+        return Storage::disk('public')->url($this->file_path);
     }
 }
