@@ -51,7 +51,12 @@ class BatchController extends Controller
     {
         $this->authorize('view', $batch);
 
-        $batch->load(['supplier', 'cars', 'payments']);
+        $batch->load([
+            'supplier',
+            'cars.firstOrder.customer',
+            'cars.currentOrder.customer',
+            'payments',
+        ]);
 
         return response()->json([
             'data' => new BatchResource($batch),

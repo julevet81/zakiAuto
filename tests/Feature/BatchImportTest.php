@@ -184,6 +184,69 @@ class BatchImportTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
+    public function test_show_batch_includes_first_and_current_owner_for_each_car(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $batch = Batch::create([
+            'supplier_id' => $this->supplier->id,
+            'purchase_date' => '2026-07-01',
+            'total_cost_foreign' => 10000.00,
+            'status' => Batch::STATUS_PARTIAL,
+            'exchange_rate' => 1.00,
+        ]);
+
+        $car = Car::create([
+            'batch_id' => $batch->id,
+            'supplier_id' => $this->supplier->id,
+            'brand' => 'Toyota',
+            'model' => 'Corolla',
+            'manufacture_year' => 2022,
+            'foreign_purchase_price' => 10000.00,
+            'sale_price' => 15000.00,
+            'status' => Car::STATUS_AVAILABLE,
+        ]);
+
+        $firstOwner = Customer::create([
+            'name' => 'First Batch Owner',
+            'passport_no' => 'FIRST123',
+            'national_id' => 'NAT-FIRST',
+        ]);
+
+        Order::create([
+            'order_number' => 'ORD-BATCH-001',
+            'customer_id' => $firstOwner->id,
+            'car_id' => $car->id,
+            'status' => Order::STATUS_SHIPPING,
+        ]);
+
+        $currentOwner = Customer::create([
+            'name' => 'Current Batch Owner',
+            'passport_no' => 'CURRENT123',
+            'national_id' => 'NAT-CURRENT',
+        ]);
+
+        Order::create([
+            'order_number' => 'ORD-BATCH-002',
+            'customer_id' => $currentOwner->id,
+            'car_id' => $car->id,
+            'status' => Order::STATUS_DELIVERED,
+        ]);
+
+        $response = $this->getJson("/api/batches/{$batch->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('data.cars.0.id', $car->id)
+            ->assertJsonPath('data.cars.0.first_owner.id', $firstOwner->id)
+            ->assertJsonPath('data.cars.0.first_owner.name', 'First Batch Owner')
+            ->assertJsonPath('data.cars.0.first_owner.passport_no', 'FIRST123')
+            ->assertJsonPath('data.cars.0.first_owner.national_id', 'NAT-FIRST')
+            ->assertJsonPath('data.cars.0.current_owner.id', $currentOwner->id)
+            ->assertJsonPath('data.cars.0.current_owner.name', 'Current Batch Owner')
+            ->assertJsonPath('data.cars.0.current_owner.passport_no', 'CURRENT123')
+            ->assertJsonPath('data.cars.0.current_owner.national_id', 'NAT-CURRENT');
+    }
+
     public function test_batch_status_transitions_automatically(): void
     {
         Sanctum::actingAs($this->user);
