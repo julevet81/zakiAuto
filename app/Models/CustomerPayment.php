@@ -101,10 +101,10 @@ class CustomerPayment extends Model
      * Determine if this customer payment has reached/been transferred to the company treasury.
      */
     public function getIsTransferredToTreasuryAttribute(): bool
-    {
-        // تكون true فقط إذا تمت الموافقة على تحويلها للخزينة العامة
-        return $this->generalTreasuryTransfer?->status === 'approved';
-    }
+{
+    return $this->generalTreasuryTransfer !== null;
+}
+
 
 
     /**

@@ -12,7 +12,7 @@ class ApproveTreasuryTransferRequest extends FormRequest
         // treasury-affecting action — same permission tier already used
         // to confirm agent remittances (admin/super-admin only). Adjust
         // here if you'd rather gate this behind a dedicated permission.
-        return $this->user()->can('agent_transactions.create');
+        return $this->user()->can('agent_transactions.approve');
     }
 
     /**
