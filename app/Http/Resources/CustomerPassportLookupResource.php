@@ -65,6 +65,7 @@ class CustomerPassportLookupResource extends JsonResource
                     'tracking_number'  => $order->car->tracking_number,
                     'container_no'     => $order->car->container_no,
                     'car_status'       => $order->car->status,
+                    'expenses'         => CarExpenseResource::collection($order->car->expenses),
                 ] : null,
 
                 // ── Financial details for this order ──────────────────
