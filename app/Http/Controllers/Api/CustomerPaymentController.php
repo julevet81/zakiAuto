@@ -367,7 +367,7 @@ class CustomerPaymentController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($request, $transfer) {
+        DB::transaction(function () use ($request, $transfer, $customerPayment) {
             $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
             $newBalance = $previousBalance + (float) $transfer->amount;
 
@@ -380,11 +380,16 @@ class CustomerPaymentController extends Controller
                 'approved_by' => $request->user()->id,
                 'approved_at' => now(),
             ]);
+
+            $customerPayment->update([
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
+            ]);
         });
 
         return response()->json([
             'message' => 'تم اعتماد تحويل الدفعة إلى الخزينة العامة بنجاح',
-            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator', 'generalTreasuryTransfer'])),
+            'data' => new CustomerPaymentResource($customerPayment->fresh(['customer', 'agent', 'creator', 'generalTreasuryTransfer', 'approver'])),
         ]);
     }
 

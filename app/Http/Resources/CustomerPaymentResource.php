@@ -44,6 +44,13 @@ class CustomerPaymentResource extends JsonResource
                 'name' => $this->creator->name,
             ]),
 
+            'approved_by' => $this->approved_by,
+            'approved_at' => $this->approved_at?->format('Y-m-d H:i:s'),
+            'approver' => $this->whenLoaded('approver', fn () => [
+                'id' => $this->approver->id,
+                'name' => $this->approver->name,
+            ]),
+
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

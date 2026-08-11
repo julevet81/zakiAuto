@@ -200,5 +200,14 @@ class CustomerPaymentTest extends TestCase
         $approveResponse = $this->postJson("/api/customer-payments/{$directPaymentId}/approve-treasury-transfer");
         $approveResponse->assertOk();
         $approveResponse->assertJsonPath('data.general_treasury_transfer_status', 'approved');
+        $approveResponse->assertJsonPath('data.approved_by', $this->user->id);
+        $approveResponse->assertJsonPath('data.approver.id', $this->user->id);
+        $approveResponse->assertJsonPath('data.approver.name', $this->user->name);
+        $approveResponse->assertJsonNotNull('data.approved_at');
+
+        $this->assertDatabaseHas('customer_payments', [
+            'id' => $directPaymentId,
+            'approved_by' => $this->user->id,
+        ]);
     }
 }

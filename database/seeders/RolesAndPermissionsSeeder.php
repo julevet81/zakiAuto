@@ -54,6 +54,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'agent_transactions.create',
         'agent_transactions.update',
         'agent_transactions.delete',
+        'agent_transactions.approve',
 
         // Treasury (company-wide cash movements)
         'treasury.view',
