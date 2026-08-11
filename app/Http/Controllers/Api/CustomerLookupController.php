@@ -43,6 +43,7 @@ class CustomerLookupController extends Controller
             ->with([
                 'orders'          => fn($q) => $q->orderBy('id'),
                 'orders.car',
+                'orders.car.expenses',
                 'orders.payments' => fn($q) => $q
                     ->orderBy('payment_date')
                     ->orderBy('id'),
