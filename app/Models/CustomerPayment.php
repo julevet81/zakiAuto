@@ -23,6 +23,8 @@ class CustomerPayment extends Model
         'payment_date',
         'notes',
         'created_by',
+        'approved_by',
+        'approved_at',
     ];
 
     protected function casts(): array
@@ -30,6 +32,7 @@ class CustomerPayment extends Model
         return [
             'amount' => 'decimal:2',
             'payment_date' => 'date',
+            'approved_at' => 'datetime',
         ];
     }
 
@@ -80,6 +83,11 @@ class CustomerPayment extends Model
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function wasCollectedByAgent(): bool

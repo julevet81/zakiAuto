@@ -203,7 +203,7 @@ class CustomerPaymentTest extends TestCase
         $approveResponse->assertJsonPath('data.approved_by', $this->user->id);
         $approveResponse->assertJsonPath('data.approver.id', $this->user->id);
         $approveResponse->assertJsonPath('data.approver.name', $this->user->name);
-        $approveResponse->assertJsonNotNull('data.approved_at');
+        $this->assertNotNull($approveResponse->json('data.approved_at'));
 
         $this->assertDatabaseHas('customer_payments', [
             'id' => $directPaymentId,
