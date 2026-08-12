@@ -24,7 +24,7 @@ class CustomerPaymentResource extends JsonResource
             'customer' => new CustomerMiniResource($this->whenLoaded('customer')),
 
             'amount' => (float) $this->amount,
-            'received_by' => Auth::user()->name,
+            'received_by' => Auth::user()?->name ?? $this->receiver?->name ?? 'System',
 
             'agent_id' => $this->agent_id,
 
@@ -38,18 +38,18 @@ class CustomerPaymentResource extends JsonResource
             'payment_date' => $this->payment_date?->format('Y-m-d'),
             'notes' => $this->notes,
 
-            'created_by' => $this->created_by,
-            'creator' => $this->whenLoaded('creator', fn () => [
+            'created_by' => $this->creator->name,
+            'creator' => $this->whenLoaded('creator', fn () => $this->creator ? [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,
-            ]),
+            ] : null),
 
-            'approved_by' => $this->approved_by,
+            'approved_by' => $this->approver?->name,
             'approved_at' => $this->approved_at?->format('Y-m-d H:i:s'),
-            'approver' => $this->whenLoaded('approver', fn () => [
+            'approver' => $this->whenLoaded('approver', fn () => $this->approver ? [
                 'id' => $this->approver->id,
                 'name' => $this->approver->name,
-            ]),
+            ] : null),
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

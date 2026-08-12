@@ -191,23 +191,48 @@ class CustomerPaymentTest extends TestCase
         $this->assertFalse($agentPaymentData['is_transferred_to_treasury']);
         $this->assertNull($agentPaymentData['general_treasury_transfer_status']);
 
-        // 3. Stage the direct payment for transfer to general treasury (should become pending)
+        // 3. Stage the direct payment (received by super-admin) for transfer to general treasury.
+        // It should become 'approved' directly because receiver is a super-admin!
         $stageResponse = $this->postJson("/api/customer-payments/{$directPaymentId}/transfer-to-treasury");
         $stageResponse->assertCreated();
-        $stageResponse->assertJsonPath('data.general_treasury_transfer_status', 'pending');
-
-        // 4. Approve the transfer to general treasury (should become approved)
-        $approveResponse = $this->postJson("/api/customer-payments/{$directPaymentId}/approve-treasury-transfer");
-        $approveResponse->assertOk();
-        $approveResponse->assertJsonPath('data.general_treasury_transfer_status', 'approved');
-        $approveResponse->assertJsonPath('data.approved_by', $this->user->id);
-        $approveResponse->assertJsonPath('data.approver.id', $this->user->id);
-        $approveResponse->assertJsonPath('data.approver.name', $this->user->name);
-        $this->assertNotNull($approveResponse->json('data.approved_at'));
+        $stageResponse->assertJsonPath('data.general_treasury_transfer_status', 'approved');
+        $stageResponse->assertJsonPath('data.approved_by', $this->user->id);
+        $stageResponse->assertJsonPath('data.approver.id', $this->user->id);
 
         $this->assertDatabaseHas('customer_payments', [
             'id' => $directPaymentId,
             'approved_by' => $this->user->id,
         ]);
+
+        // 4. Test the flow for a regular user (pending -> approved)
+        $regularUser = User::create([
+            'name' => 'Regular User',
+            'email' => 'regular@test.com',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+
+        $regularPayment = CustomerPayment::create([
+            'order_id' => $this->order->id,
+            'customer_id' => $this->customer->id,
+            'amount' => 3000,
+            'received_by' => $regularUser->id,
+            'payment_date' => now()->toDateString(),
+            'notes' => 'Received by regular user',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Stage the regular payment (should become pending)
+        $stageRegular = $this->postJson("/api/customer-payments/{$regularPayment->id}/transfer-to-treasury");
+        $stageRegular->assertCreated();
+        $stageRegular->assertJsonPath('data.general_treasury_transfer_status', 'pending');
+
+        // Approve the transfer (should become approved)
+        $approveRegular = $this->postJson("/api/customer-payments/{$regularPayment->id}/approve-treasury-transfer");
+        $approveRegular->assertOk();
+        $approveRegular->assertJsonPath('data.general_treasury_transfer_status', 'approved');
+        $approveRegular->assertJsonPath('data.approved_by', $this->user->id);
+        $approveRegular->assertJsonPath('data.approver.name', $this->user->name);
+        $this->assertNotNull($approveRegular->json('data.approved_at'));
     }
 }

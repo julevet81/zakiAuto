@@ -19,12 +19,6 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerPaymentController extends Controller
 {
-    /**
-     * List customer payments, scoped by who's asking:
-     *   - admin/super-admin (customer_payments.view): every payment.
-     *   - customer/agent (customer_payments.view_own): only their own
-     *     (as the payer, or as the agent who collected it).
-     */
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', CustomerPayment::class);
@@ -318,6 +312,46 @@ class CustomerPaymentController extends Controller
             ], 422);
         }
 
+        $receiver = $customerPayment->receiver;
+        $isDirectApproved = $receiver && $receiver->hasAnyRole(['admin', 'super-admin']);
+
+        if ($isDirectApproved) {
+            $transfer = DB::transaction(function () use ($request, $customerPayment) {
+                $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
+                $newBalance = $previousBalance + (float) $customerPayment->amount;
+
+                $t = TreasuryTransaction::create([
+                    'direction' => TreasuryTransaction::DIRECTION_OUT,
+                    'amount' => $customerPayment->amount,
+                    'previous_balence' => $previousBalance,
+                    'current_balence' => $newBalance,
+                    'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
+                    'source_id' => $customerPayment->id,
+                    'transaction_date' => now()->toDateString(),
+                    'status' => TreasuryTransaction::STATUS_APPROVED,
+                    'notes' => 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' إلى الخزينة العامة - معتمد تلقائياً',
+                    'created_by' => $request->user()->name,
+                    'approved_by' => $request->user()->name,
+                    'approved_at' => now(),
+                ]);
+
+                $customerPayment->update([
+                    'approved_by' => $request->user()->name,
+                    'approved_at' => now(),
+                ]);
+
+                return $t;
+            });
+
+            return response()->json([
+                'message' => 'تم تحويل الدفعة واعتمادها في الخزينة العامة بنجاح',
+                'data' => new CustomerPaymentResource(
+                    $customerPayment->fresh(['customer', 'agent', 'creator', 'generalTreasuryTransfer', 'approver'])
+                ),
+                'treasury_transfer_id' => $transfer->id,
+            ], 201);
+        }
+
         $treasurytransaction = TreasuryTransaction::latest('id')->first();
         // إنشاء عملية معلقة دون التأثير على رصيد الخزينة
         $transfer = TreasuryTransaction::create([
@@ -377,12 +411,12 @@ class CustomerPaymentController extends Controller
                 'current_balence' => $newBalance,
                 'transaction_date' => $request->input('approval_date', now()->toDateString()),
                 'notes' => $request->input('notes', $transfer->notes),
-                'approved_by' => $request->user()->id,
+                'approved_by' => $request->user()->name,
                 'approved_at' => now(),
             ]);
 
             $customerPayment->update([
-                'approved_by' => $request->user()->id,
+                'approved_by' => $request->user()->name,
                 'approved_at' => now(),
             ]);
         });

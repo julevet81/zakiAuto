@@ -16,6 +16,31 @@ use Illuminate\Http\Request;
 class CarController extends Controller
 {
     /**
+     * Public catalogue endpoint: list only available cars without requiring
+     * a Sanctum token. CarResource already hides purchase/cost fields for
+     * guest requests because there is no authenticated cars.view_cost user.
+     */
+    public function available(Request $request): JsonResponse
+    {
+        $query = Car::query()
+            ->where('status', Car::STATUS_AVAILABLE)
+            ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $term = $request->string('search');
+                $q->where(function ($q) use ($term) {
+                    $q->where('brand', 'like', "%{$term}%")
+                        ->orWhere('model', 'like', "%{$term}%")
+                        ->orWhere('vin', 'like', "%{$term}%");
+                });
+            })
+            ->orderByDesc('id');
+
+        $cars = $query->paginate($request->integer('per_page', 15));
+
+        return response()->json(CarResource::collection($cars)->response()->getData(true));
+    }
+
+    /**
      * List cars with filters relevant to every audience:
      *   - super-admin (cars.view_cost): full data including cost/profit.
      *   - admin (suppliers.view but NOT cars.view_cost): full operational

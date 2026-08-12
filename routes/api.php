@@ -72,6 +72,9 @@ Route::middleware('throttle:lookup')->group(function () {
     Route::get('lookup/customer',               [CustomerLookupController::class, 'show']);
 });
 
+// Public catalogue - NO auth token required.
+Route::get('cars/available', [CarController::class, 'available']);
+
 Route::middleware(['auth:sanctum', 'staff_only'])->group(function () {
 
     // ------------------------------------------------------------------
