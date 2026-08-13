@@ -23,7 +23,7 @@ class CarController extends Controller
     public function available(Request $request): JsonResponse
     {
         $query = Car::query()
-            ->where('status', Car::STATUS_AVAILABLE)
+            ->where('status', '!=', Car::STATUS_SOLD)
             ->when($request->filled('brand'), fn($q) => $q->where('brand', 'like', '%' . $request->string('brand') . '%'))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
