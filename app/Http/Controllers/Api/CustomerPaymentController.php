@@ -94,6 +94,8 @@ class CustomerPaymentController extends Controller
                 'payment_date' => $request->validated('payment_date'),
                 'notes' => $request->validated('notes'),
                 'created_by' => $request->user()->id,
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
             ]);
 
             $order = Order::find($payment->order_id);
