@@ -330,13 +330,13 @@ class CustomerPaymentController extends Controller
                     'transaction_date' => now()->toDateString(),
                     'status' => TreasuryTransaction::STATUS_APPROVED,
                     'notes' => 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' إلى الخزينة العامة - معتمد تلقائياً',
-                    'created_by' => $request->user()->name,
-                    'approved_by' => $request->user()->name,
+                    'created_by' => $request->user()->id,
+                    'approved_by' => $request->user()->id,
                     'approved_at' => now(),
                 ]);
 
                 $customerPayment->update([
-                    'approved_by' => $request->user()->name,
+                    'approved_by' => $request->user()->id,
                     'approved_at' => now(),
                 ]);
 
@@ -411,12 +411,12 @@ class CustomerPaymentController extends Controller
                 'current_balence' => $newBalance,
                 'transaction_date' => $request->input('approval_date', now()->toDateString()),
                 'notes' => $request->input('notes', $transfer->notes),
-                'approved_by' => $request->user()->name,
+                'approved_by' => $request->user()->id,
                 'approved_at' => now(),
             ]);
 
             $customerPayment->update([
-                'approved_by' => $request->user()->name,
+                'approved_by' => $request->user()->id,
                 'approved_at' => now(),
             ]);
         });
