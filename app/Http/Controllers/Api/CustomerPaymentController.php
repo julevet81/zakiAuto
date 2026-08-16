@@ -368,6 +368,8 @@ class CustomerPaymentController extends Controller
             'status' => TreasuryTransaction::STATUS_PENDING,
             'notes' => 'تحويل دفعة عميل رقم #' . $customerPayment->id . ' إلى الخزينة العامة - بانتظار الاعتماد',
             'created_by' => $request->user()->id,
+            'approved_by' => $request->user()->id,
+            'approved_at' => now(),
         ]);
 
         return response()->json([
