@@ -150,7 +150,7 @@ class CustomerPaymentTest extends TestCase
     {
         Sanctum::actingAs($this->user);
 
-        // 1. Direct payment to company (should be automatically in treasury, general treasury status: null)
+        // 1. Direct payment to company by super-admin (should be automatically transferred and approved)
         $directResponse = $this->postJson('/api/customer-payments', [
             'order_id' => $this->order->id,
             'customer_id' => $this->customer->id,
@@ -160,7 +160,7 @@ class CustomerPaymentTest extends TestCase
         ]);
         $directResponse->assertCreated();
         $directResponse->assertJsonPath('data.is_transferred_to_treasury', true);
-        $directResponse->assertJsonPath('data.general_treasury_transfer_status', null);
+        $directResponse->assertJsonPath('data.general_treasury_transfer_status', 'approved');
 
         $directPaymentId = $directResponse->json('data.id');
 
@@ -185,19 +185,18 @@ class CustomerPaymentTest extends TestCase
         
         $directPaymentData = collect($indexResponse->json('data'))->firstWhere('id', $directPaymentId);
         $this->assertTrue($directPaymentData['is_transferred_to_treasury']);
-        $this->assertNull($directPaymentData['general_treasury_transfer_status']);
+        $this->assertEquals('approved', $directPaymentData['general_treasury_transfer_status']);
 
         $agentPaymentData = collect($indexResponse->json('data'))->firstWhere('id', $agentPaymentId);
         $this->assertFalse($agentPaymentData['is_transferred_to_treasury']);
         $this->assertNull($agentPaymentData['general_treasury_transfer_status']);
 
-        // 3. Stage the direct payment (received by super-admin) for transfer to general treasury.
-        // It should become 'approved' directly because receiver is a super-admin!
+        // 3. Staging the direct payment again should be rejected with 422 because it's already approved.
         $stageResponse = $this->postJson("/api/customer-payments/{$directPaymentId}/transfer-to-treasury");
-        $stageResponse->assertCreated();
-        $stageResponse->assertJsonPath('data.general_treasury_transfer_status', 'approved');
-        $stageResponse->assertJsonPath('data.approved_by', $this->user->id);
-        $stageResponse->assertJsonPath('data.approver.id', $this->user->id);
+        $stageResponse->assertStatus(422);
+        $stageResponse->assertJsonFragment([
+            'message' => 'تم تحويل هذه الدفعة واعتمادها في الخزينة العامة بالفعل'
+        ]);
 
         $this->assertDatabaseHas('customer_payments', [
             'id' => $directPaymentId,
@@ -231,7 +230,7 @@ class CustomerPaymentTest extends TestCase
         $approveRegular = $this->postJson("/api/customer-payments/{$regularPayment->id}/approve-treasury-transfer");
         $approveRegular->assertOk();
         $approveRegular->assertJsonPath('data.general_treasury_transfer_status', 'approved');
-        $approveRegular->assertJsonPath('data.approved_by', $this->user->id);
+        $approveRegular->assertJsonPath('data.approved_by', $this->user->name);
         $approveRegular->assertJsonPath('data.approver.name', $this->user->name);
         $this->assertNotNull($approveRegular->json('data.approved_at'));
     }

@@ -94,17 +94,37 @@ class CustomerPaymentController extends Controller
                 'payment_date' => $request->validated('payment_date'),
                 'notes' => $request->validated('notes'),
                 'created_by' => $request->user()->id,
-                'approved_by' => $request->user()->id,
-                'approved_at' => now(),
             ]);
 
             $order = Order::find($payment->order_id);
             $order?->recalculateBalance();
 
+            $isAdminOrSuperAdmin = $request->user()->hasAnyRole(['admin', 'super-admin']);
+
             if ($payment->wasCollectedByAgent()) {
                 $this->postAgentLedgerEntry($payment, $request->user()->id);
             } else {
                 $this->postTreasuryMovement($payment, $request->user()->id);
+
+                if ($isAdminOrSuperAdmin) {
+                    $previousBalance = (float) (TreasuryTransaction::query()->approved()->latest('id')->value('current_balence') ?? 0);
+                    $newBalance = $previousBalance + (float) $payment->amount;
+
+                    TreasuryTransaction::create([
+                        'direction' => TreasuryTransaction::DIRECTION_OUT,
+                        'amount' => $payment->amount,
+                        'previous_balence' => $previousBalance,
+                        'current_balence' => $newBalance,
+                        'source_type' => TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT,
+                        'source_id' => $payment->id,
+                        'transaction_date' => $payment->payment_date ? $payment->payment_date->toDateString() : now()->toDateString(),
+                        'status' => TreasuryTransaction::STATUS_APPROVED,
+                        'notes' => 'تحويل دفعة عميل رقم #' . $payment->id . ' إلى الخزينة العامة - معتمد تلقائياً عند الإنشاء',
+                        'created_by' => $request->user()->id,
+                        'approved_by' => $request->user()->id,
+                        'approved_at' => now(),
+                    ]);
+                }
             }
 
             return $payment;
@@ -300,17 +320,12 @@ class CustomerPaymentController extends Controller
     {
         $this->authorize('view', $customerPayment);
 
-        // لا تسمح بإرسال نفس الدفعة أكثر من مرة
-        $alreadyPending = TreasuryTransaction::query()
-            ->where('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT)
-            ->where('source_id', $customerPayment->id)
-            ->where('direction', TreasuryTransaction::DIRECTION_OUT)
-            ->where('status', TreasuryTransaction::STATUS_PENDING)
-            ->exists();
-
-        if ($alreadyPending) {
+        if ($customerPayment->generalTreasuryTransfer) {
+            $statusMsg = $customerPayment->generalTreasuryTransfer->status === TreasuryTransaction::STATUS_APPROVED
+                ? 'تم تحويل هذه الدفعة واعتمادها في الخزينة العامة بالفعل'
+                : 'هذه الدفعة قيد التحويل للخزينة العامة بالفعل، بانتظار اعتماد الإدارة';
             return response()->json([
-                'message' => 'هذه الدفعة قيد التحويل للخزينة العامة بالفعل، بانتظار اعتماد الإدارة',
+                'message' => $statusMsg,
             ], 422);
         }
 
