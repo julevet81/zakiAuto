@@ -58,22 +58,27 @@ class TreasuryController extends Controller
 
         return response()->json([
             'current_balance' => $currentBalance,
-            'data'            => $transactions->map(fn($tx) => [
-                'id'               => $tx->id,
-                'direction'        => $tx->direction,
-                'amount'           => (float) $tx->amount,
-                'previous_balence' => (float) $tx->previous_balence,
-                'current_balence'  => (float) $tx->current_balence,
-                'source_type'      => $tx->source_type,
-                'source_id'        => $tx->source_id,
-                'transaction_date' => $tx->transaction_date?->format('Y-m-d'),
-                'notes'            => $tx->notes,
-                'creator'          => $tx->creator ? [
-                    'id'   => $tx->creator->id,
-                    'name' => $tx->creator->name,
-                ] : null,
-                'created_at'       => $tx->created_at,
-            ]),
+            'data'            => $transactions->map(function ($tx) {
+                $source = $tx->source();
+                return [
+                    'id'               => $tx->id,
+                    'direction'        => $tx->direction,
+                    'amount'           => (float) $tx->amount,
+                    'previous_balence' => (float) $tx->previous_balence,
+                    'current_balence'  => (float) $tx->current_balence,
+                    'source_type'      => $tx->source_type,
+                    'source_id'        => $tx->source_id,
+                    'transaction_date' => $tx->transaction_date?->format('Y-m-d'),
+                    'notes'            => $tx->notes,
+                    'customer_name'    => $tx->source_type === TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT && $source ? ($source->customer?->name ?? 'عميل غير معروف') : null,
+                    'supplier_name'    => $tx->source_type === TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT && $source ? ($source->supplier?->name ?? 'مورد غير معروف') : null,
+                    'creator'          => $tx->creator ? [
+                        'id'   => $tx->creator->id,
+                        'name' => $tx->creator->name,
+                    ] : null,
+                    'created_at'       => $tx->created_at,
+                ];
+            }),
             'meta' => [
                 'current_page' => $transactions->currentPage(),
                 'last_page'    => $transactions->lastPage(),

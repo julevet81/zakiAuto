@@ -19,6 +19,8 @@ class TreasuryTransactionResource extends JsonResource
             'source_id' => $this->source_id,
             'transaction_date' => $this->transaction_date?->format('Y-m-d'),
             'notes' => $this->notes,
+            'customer_name' => $this->source_type === \App\Models\TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT ? ($this->source()?->customer?->name ?? 'عميل غير معروف') : null,
+            'supplier_name' => $this->source_type === \App\Models\TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT ? ($this->source()?->supplier?->name ?? 'مورد غير معروف') : null,
             'created_by' => $this->created_by,
             'creator' => $this->relationLoaded('creator') && $this->creator ? [
                 'id' => $this->creator->id,

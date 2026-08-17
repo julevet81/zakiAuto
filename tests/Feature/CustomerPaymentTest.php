@@ -234,4 +234,74 @@ class CustomerPaymentTest extends TestCase
         $approveRegular->assertJsonPath('data.approver.name', $this->user->name);
         $this->assertNotNull($approveRegular->json('data.approved_at'));
     }
+
+    public function test_treasury_summary_displays_customer_and_supplier_names(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        // 1. Create a customer payment that goes to the treasury
+        $this->postJson('/api/customer-payments', [
+            'order_id' => $this->order->id,
+            'customer_id' => $this->customer->id,
+            'amount' => 5000,
+            'payment_date' => now()->toDateString(),
+            'notes' => 'Customer payment test',
+        ])->assertCreated();
+
+        // 2. Create a supplier payment
+        $supplier = Supplier::create([
+            'name' => 'Fancy Supplier',
+            'phone' => '0599999999',
+            'email' => 'fancy@test.com',
+        ]);
+        $batch = new Batch([
+            'supplier_id' => $supplier->id,
+            'status' => 'partial',
+        ]);
+        $batch->forceFill([
+            'total_cost_foreign' => 10000.00,
+            'exchange_rate' => 1.0,
+        ]);
+        $batch->save();
+        
+        // Let's seed initial treasury balance to afford the supplier payment
+        TreasuryTransaction::create([
+            'direction' => TreasuryTransaction::DIRECTION_IN,
+            'amount' => 100000,
+            'previous_balence' => 0,
+            'current_balence' => 100000,
+            'source_type' => 'manual_deposit',
+            'source_id' => 0,
+            'transaction_date' => now()->toDateString(),
+            'status' => TreasuryTransaction::STATUS_APPROVED,
+            'notes' => 'Top up',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->postJson('/api/supplier-payments', [
+            'batch_id' => $batch->id,
+            'supplier_id' => $supplier->id,
+            'amount_foreign' => 2000,
+            'exchange_rate' => 1.0,
+            'amount_local' => 2000,
+            'payment_date' => now()->toDateString(),
+            'notes' => 'Supplier payment test',
+        ])->assertCreated();
+
+        // 3. Request treasury summary index
+        $response = $this->getJson('/api/tresury/summary');
+        $response->assertOk();
+
+        // Check customer payment transaction contains the customer name
+        $customerTx = collect($response->json('data'))->firstWhere('source_type', TreasuryTransaction::SOURCE_CUSTOMER_PAYMENT);
+        $this->assertNotNull($customerTx);
+        $this->assertEquals('Test Customer', $customerTx['customer_name']);
+        $this->assertNull($customerTx['supplier_name']);
+
+        // Check supplier payment transaction contains the supplier name
+        $supplierTx = collect($response->json('data'))->firstWhere('source_type', TreasuryTransaction::SOURCE_SUPPLIER_PAYMENT);
+        $this->assertNotNull($supplierTx);
+        $this->assertEquals('Fancy Supplier', $supplierTx['supplier_name']);
+        $this->assertNull($supplierTx['customer_name']);
+    }
 }

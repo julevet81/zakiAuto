@@ -124,6 +124,11 @@ class CustomerPaymentController extends Controller
                         'approved_by' => $request->user()->id,
                         'approved_at' => now(),
                     ]);
+
+                    $payment->update([
+                        'approved_by' => $request->user()->id,
+                        'approved_at' => now(),
+                    ]);
                 }
             }
 
